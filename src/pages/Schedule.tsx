@@ -82,7 +82,7 @@ export default function Schedule() {
               <div>
                 <h3 className="font-heading font-semibold text-foreground">Training Location</h3>
                 <p className="text-muted-foreground text-sm">
-                  Elite Soccer Academy Field - 123 Soccer Lane, City Park
+                  Mighty Athletics Field - 123 Sports Lane, City Park
                 </p>
               </div>
             </CardContent>
