@@ -13,12 +13,12 @@ export function Footer() {
                 <Trophy className="w-5 h-5" />
               </div>
               <span className="font-heading font-bold text-xl">
-                Elite Soccer Academy
+                Mighty Athletics
               </span>
             </div>
             <p className="text-primary-foreground/80 text-sm leading-relaxed">
-              Building tomorrow's champions through professional soccer training, 
-              discipline, and teamwork.
+              Building tomorrow's champions through professional athletic training 
+              with Coach David Maldonado.
             </p>
           </div>
 
@@ -59,7 +59,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-primary-foreground/20 mt-8 pt-8 text-center text-primary-foreground/60 text-sm">
-          © {new Date().getFullYear()} Elite Soccer Academy. All rights reserved.
+          © {new Date().getFullYear()} Mighty Athletics. All rights reserved.
         </div>
       </div>
     </footer>
