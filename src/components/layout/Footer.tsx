@@ -13,7 +13,7 @@ export function Footer() {
                 <Trophy className="w-5 h-5" />
               </div>
               <span className="font-heading font-bold text-xl">
-                Mighty Athletics
+                Mighty Athletic Academy
               </span>
             </div>
             <p className="text-primary-foreground/80 text-sm leading-relaxed">
@@ -44,22 +44,22 @@ export function Footer() {
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-3 text-primary-foreground/80">
                 <Mail className="w-4 h-4" />
-                <span className="text-sm">info@elitesoccer.com</span>
+                <span className="text-sm">mightyathleticacademy@gmail.com</span>
               </div>
               <div className="flex items-center gap-3 text-primary-foreground/80">
                 <Phone className="w-4 h-4" />
-                <span className="text-sm">(555) 123-4567</span>
+                <span className="text-sm">804-901-4427</span>
               </div>
               <div className="flex items-center gap-3 text-primary-foreground/80">
                 <MapPin className="w-4 h-4" />
-                <span className="text-sm">123 Soccer Field Lane</span>
+                <span className="text-sm">Deep Run Park / Glover Park</span>
               </div>
             </div>
           </div>
         </div>
 
         <div className="border-t border-primary-foreground/20 mt-8 pt-8 text-center text-primary-foreground/60 text-sm">
-          © {new Date().getFullYear()} Mighty Athletics. All rights reserved.
+          © {new Date().getFullYear()} Mighty Athletic Academy. All rights reserved.
         </div>
       </div>
     </footer>

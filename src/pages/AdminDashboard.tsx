@@ -124,7 +124,7 @@ export default function AdminDashboard() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div>
             <h1 className="font-heading font-bold text-xl text-foreground">Admin Dashboard</h1>
-            <p className="text-sm text-muted-foreground">Mighty Athletics - Coach David Maldonado</p>
+            <p className="text-sm text-muted-foreground">Mighty Athletic Academy - Coach David Maldonado</p>
           </div>
           <Button variant="ghost" onClick={handleLogout}>
             <LogOut className="w-4 h-4 mr-2" />
