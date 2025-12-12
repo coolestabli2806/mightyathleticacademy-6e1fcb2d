@@ -25,7 +25,7 @@ export function Navbar() {
               <Trophy className="w-5 h-5 text-primary-foreground" />
             </div>
             <span className="font-heading font-bold text-xl text-foreground">
-              Mighty <span className="text-primary">Athletics</span>
+              Mighty <span className="text-primary">Athletic Academy</span>
             </span>
           </Link>
 

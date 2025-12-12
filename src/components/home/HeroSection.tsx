@@ -30,7 +30,7 @@ export function HeroSection() {
           </h1>
           
           <p className="text-lg text-primary-foreground/80 mb-8 leading-relaxed max-w-xl animate-slide-up" style={{ animationDelay: "0.1s" }}>
-            Professional coaching by Coach David Maldonado. Join Mighty Athletics and watch your child 
+            Professional coaching by Coach David Maldonado. Join Mighty Athletic Academy and watch your child 
             develop skills, discipline, and a love for sports.
           </p>
 
