@@ -1,1 +1,4 @@
 project_id = "iyvbndnruflcseawssqp"
+
+[functions.add-to-sheets]
+verify_jwt = false

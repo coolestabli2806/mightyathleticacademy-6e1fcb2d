@@ -7,10 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
-import { CheckCircle, UserPlus } from "lucide-react";
+import { CheckCircle, UserPlus, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Register() {
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     childName: "",
     age: "",
@@ -21,7 +23,7 @@ export default function Register() {
     notes: "",
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Basic validation
@@ -34,12 +36,30 @@ export default function Register() {
       return;
     }
 
-    // Simulate form submission
-    setIsSubmitted(true);
-    toast({
-      title: "Registration Submitted!",
-      description: "We'll contact you soon with next steps.",
-    });
+    setIsLoading(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('add-to-sheets', {
+        body: formData,
+      });
+
+      if (error) throw error;
+
+      setIsSubmitted(true);
+      toast({
+        title: "Registration Submitted!",
+        description: "We'll contact you soon with next steps.",
+      });
+    } catch (error) {
+      console.error('Registration error:', error);
+      toast({
+        title: "Registration Error",
+        description: "There was an issue submitting your registration. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isSubmitted) {
@@ -186,8 +206,15 @@ export default function Register() {
                   />
                 </div>
 
-                <Button type="submit" variant="hero" size="lg" className="w-full">
-                  Submit Registration
+                <Button type="submit" variant="hero" size="lg" className="w-full" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit Registration"
+                  )}
                 </Button>
               </form>
             </CardContent>
