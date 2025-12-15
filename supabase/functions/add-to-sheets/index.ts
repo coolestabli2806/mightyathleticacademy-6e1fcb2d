@@ -63,6 +63,9 @@ async function getAccessToken(serviceAccountKey: any): Promise<string> {
 }
 
 serve(async (req) => {
+  console.log('Edge function invoked, method:', req.method);
+  console.log('Content-Type:', req.headers.get('content-type'));
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -74,18 +77,9 @@ serve(async (req) => {
       throw new Error('Invalid service account key');
     }
 
-    // Read the raw body text first for debugging
-    const bodyText = await req.text();
-    console.log('Raw request body:', bodyText);
-    
-    // Parse the JSON
-    let requestData;
-    try {
-      requestData = JSON.parse(bodyText);
-    } catch (parseError) {
-      console.error('JSON parse error:', parseError);
-      throw new Error(`Invalid JSON in request body: ${bodyText.substring(0, 100)}`);
-    }
+    // Use req.json() directly - the supabase client sends proper JSON
+    const requestData = await req.json();
+    console.log('Parsed request data:', JSON.stringify(requestData));
     
     const { childName, age, parentName, email, phone, experience, notes } = requestData;
     console.log('Received registration data:', { childName, age, parentName, email });
