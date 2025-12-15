@@ -74,7 +74,20 @@ serve(async (req) => {
       throw new Error('Invalid service account key');
     }
 
-    const { childName, age, parentName, email, phone, experience, notes } = await req.json();
+    // Read the raw body text first for debugging
+    const bodyText = await req.text();
+    console.log('Raw request body:', bodyText);
+    
+    // Parse the JSON
+    let requestData;
+    try {
+      requestData = JSON.parse(bodyText);
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError);
+      throw new Error(`Invalid JSON in request body: ${bodyText.substring(0, 100)}`);
+    }
+    
+    const { childName, age, parentName, email, phone, experience, notes } = requestData;
     console.log('Received registration data:', { childName, age, parentName, email });
 
     const accessToken = await getAccessToken(serviceAccountKey);
