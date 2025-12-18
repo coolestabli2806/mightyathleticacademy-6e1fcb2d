@@ -1,53 +1,33 @@
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin } from "lucide-react";
+import { Calendar, Clock, MapPin, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
-// Sample schedule data
-const weeklySchedule = [
-  {
-    day: "Monday",
-    sessions: [
-      { time: "4:00 PM - 5:30 PM", ageGroup: "Ages 5-8", type: "Fundamentals" },
-      { time: "5:30 PM - 7:00 PM", ageGroup: "Ages 9-12", type: "Skills Development" },
-    ],
-  },
-  {
-    day: "Wednesday",
-    sessions: [
-      { time: "4:00 PM - 5:30 PM", ageGroup: "Ages 5-8", type: "Fundamentals" },
-      { time: "5:30 PM - 7:00 PM", ageGroup: "Ages 9-12", type: "Skills Development" },
-    ],
-  },
-  {
-    day: "Thursday",
-    sessions: [
-      { time: "5:00 PM - 6:30 PM", ageGroup: "Ages 13-16", type: "Advanced Training" },
-    ],
-  },
-  {
-    day: "Saturday",
-    sessions: [
-      { time: "9:00 AM - 10:30 AM", ageGroup: "Ages 5-8", type: "Fun & Games" },
-      { time: "10:30 AM - 12:00 PM", ageGroup: "Ages 9-12", type: "Match Practice" },
-      { time: "12:00 PM - 1:30 PM", ageGroup: "Ages 13-16", type: "Competitive Training" },
-    ],
-  },
-];
+interface Schedule {
+  id: string;
+  day: string;
+  time: string;
+  age_group: string;
+  session_type: string;
+}
+
+const DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 const getTypeColor = (type: string) => {
   switch (type) {
     case "Fundamentals":
       return "success";
-    case "Skills Development":
+    case "Skills":
       return "default";
-    case "Advanced Training":
+    case "Training":
       return "pending";
-    case "Fun & Games":
+    case "Games":
       return "warning";
-    case "Match Practice":
+    case "Match":
       return "secondary";
-    case "Competitive Training":
+    case "Practice":
       return "destructive";
     default:
       return "default";
@@ -55,6 +35,40 @@ const getTypeColor = (type: string) => {
 };
 
 export default function Schedule() {
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSchedules();
+  }, []);
+
+  const fetchSchedules = async () => {
+    const { data, error } = await supabase
+      .from('schedules')
+      .select('*');
+
+    if (error) {
+      console.error('Error fetching schedules:', error);
+    } else {
+      setSchedules(data || []);
+    }
+    setLoading(false);
+  };
+
+  // Group schedules by day
+  const schedulesByDay = schedules.reduce((acc, schedule) => {
+    if (!acc[schedule.day]) {
+      acc[schedule.day] = [];
+    }
+    acc[schedule.day].push(schedule);
+    return acc;
+  }, {} as Record<string, Schedule[]>);
+
+  // Sort days and sessions
+  const sortedDays = Object.keys(schedulesByDay).sort(
+    (a, b) => DAYS_ORDER.indexOf(a) - DAYS_ORDER.indexOf(b)
+  );
+
   return (
     <Layout>
       <section className="py-20 bg-secondary min-h-screen">
@@ -89,38 +103,50 @@ export default function Schedule() {
           </Card>
 
           {/* Schedule Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-            {weeklySchedule.map((day) => (
-              <Card key={day.day} className="border-none shadow-card overflow-hidden">
-                <div className="bg-gradient-hero p-4">
-                  <h3 className="font-heading font-bold text-xl text-primary-foreground">
-                    {day.day}
-                  </h3>
-                </div>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    {day.sessions.map((session, index) => (
-                      <div 
-                        key={index} 
-                        className="flex items-start gap-4 p-4 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
-                      >
-                        <div className="flex items-center gap-2 text-muted-foreground min-w-[140px]">
-                          <Clock className="w-4 h-4" />
-                          <span className="text-sm">{session.time}</span>
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-foreground">{session.ageGroup}</p>
-                          <Badge variant={getTypeColor(session.type) as any} className="mt-1">
-                            {session.type}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : sortedDays.length === 0 ? (
+            <Card className="max-w-2xl mx-auto border-none shadow-card">
+              <CardContent className="p-12 text-center">
+                <p className="text-muted-foreground">Schedule coming soon. Please check back later!</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+              {sortedDays.map((day) => (
+                <Card key={day} className="border-none shadow-card overflow-hidden">
+                  <div className="bg-gradient-hero p-4">
+                    <h3 className="font-heading font-bold text-xl text-primary-foreground">
+                      {day}
+                    </h3>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <CardContent className="p-6">
+                    <div className="space-y-4">
+                      {schedulesByDay[day].map((session) => (
+                        <div 
+                          key={session.id} 
+                          className="flex items-start gap-4 p-4 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
+                        >
+                          <div className="flex items-center gap-2 text-muted-foreground min-w-[100px]">
+                            <Clock className="w-4 h-4" />
+                            <span className="text-sm">{session.time}</span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-foreground">Ages {session.age_group}</p>
+                            <Badge variant={getTypeColor(session.session_type) as any} className="mt-1">
+                              {session.session_type}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
           {/* Payment Info */}
           <Card className="max-w-2xl mx-auto mt-12 border-none shadow-card bg-accent/10">

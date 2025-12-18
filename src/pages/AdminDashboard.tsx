@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   Users, Calendar, DollarSign, CheckCircle, 
   LogOut, Plus, Search, MoreVertical, 
-  UserCheck, Clock, AlertCircle, RefreshCw
+  UserCheck, Clock, AlertCircle, RefreshCw, Trash2, Edit
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,23 +32,33 @@ interface Registration {
   created_at: string;
 }
 
-const scheduleData = [
-  { day: "Monday", time: "4:00 PM", ageGroup: "5-8", type: "Fundamentals" },
-  { day: "Monday", time: "5:30 PM", ageGroup: "9-12", type: "Skills" },
-  { day: "Wednesday", time: "4:00 PM", ageGroup: "5-8", type: "Fundamentals" },
-  { day: "Wednesday", time: "5:30 PM", ageGroup: "9-12", type: "Skills" },
-  { day: "Saturday", time: "9:00 AM", ageGroup: "5-8", type: "Games" },
-  { day: "Saturday", time: "10:30 AM", ageGroup: "9-12", type: "Match" },
-];
+interface Schedule {
+  id: string;
+  day: string;
+  time: string;
+  age_group: string;
+  session_type: string;
+}
+
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const TIMES = ['8:00 AM', '9:00 AM', '10:00 AM', '10:30 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM', '6:00 PM'];
+const AGE_GROUPS = ['5-8', '9-12', '13-16', 'All Ages'];
+const SESSION_TYPES = ['Fundamentals', 'Skills', 'Games', 'Match', 'Training', 'Practice'];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [players, setPlayers] = useState<Registration[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [newPlayer, setNewPlayer] = useState({
     child_name: "", age: "", parent_name: "", phone: "", email: "", experience: ""
+  });
+  const [newSchedule, setNewSchedule] = useState({
+    day: "", time: "", age_group: "", session_type: ""
   });
 
   useEffect(() => {
@@ -57,6 +67,7 @@ export default function AdminDashboard() {
       navigate("/admin");
     } else {
       fetchPlayers();
+      fetchSchedules();
     }
   }, [navigate]);
 
@@ -74,6 +85,19 @@ export default function AdminDashboard() {
       setPlayers(data || []);
     }
     setLoading(false);
+  };
+
+  const fetchSchedules = async () => {
+    const { data, error } = await supabase
+      .from('schedules')
+      .select('*')
+      .order('day', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching schedules:', error);
+    } else {
+      setSchedules(data || []);
+    }
   };
 
   const handleLogout = () => {
@@ -171,11 +195,96 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleAddSchedule = async () => {
+    if (!newSchedule.day || !newSchedule.time || !newSchedule.age_group || !newSchedule.session_type) {
+      toast({ title: "Please fill all fields", variant: "destructive" });
+      return;
+    }
+    
+    const { error } = await supabase.from('schedules').insert({
+      day: newSchedule.day,
+      time: newSchedule.time,
+      age_group: newSchedule.age_group,
+      session_type: newSchedule.session_type,
+    });
+
+    if (error) {
+      toast({ title: "Error adding session", variant: "destructive" });
+    } else {
+      setNewSchedule({ day: "", time: "", age_group: "", session_type: "" });
+      setIsScheduleDialogOpen(false);
+      toast({ title: "Session added!" });
+      fetchSchedules();
+    }
+  };
+
+  const handleUpdateSchedule = async () => {
+    if (!editingSchedule || !newSchedule.day || !newSchedule.time || !newSchedule.age_group || !newSchedule.session_type) {
+      toast({ title: "Please fill all fields", variant: "destructive" });
+      return;
+    }
+    
+    const { error } = await supabase
+      .from('schedules')
+      .update({
+        day: newSchedule.day,
+        time: newSchedule.time,
+        age_group: newSchedule.age_group,
+        session_type: newSchedule.session_type,
+      })
+      .eq('id', editingSchedule.id);
+
+    if (error) {
+      toast({ title: "Error updating session", variant: "destructive" });
+    } else {
+      setNewSchedule({ day: "", time: "", age_group: "", session_type: "" });
+      setEditingSchedule(null);
+      setIsScheduleDialogOpen(false);
+      toast({ title: "Session updated!" });
+      fetchSchedules();
+    }
+  };
+
+  const handleDeleteSchedule = async (scheduleId: string) => {
+    const { error } = await supabase
+      .from('schedules')
+      .delete()
+      .eq('id', scheduleId);
+
+    if (error) {
+      toast({ title: "Error removing session", variant: "destructive" });
+    } else {
+      toast({ title: "Session removed" });
+      fetchSchedules();
+    }
+  };
+
+  const openEditSchedule = (schedule: Schedule) => {
+    setEditingSchedule(schedule);
+    setNewSchedule({
+      day: schedule.day,
+      time: schedule.time,
+      age_group: schedule.age_group,
+      session_type: schedule.session_type,
+    });
+    setIsScheduleDialogOpen(true);
+  };
+
+  const openAddSchedule = () => {
+    setEditingSchedule(null);
+    setNewSchedule({ day: "", time: "", age_group: "", session_type: "" });
+    setIsScheduleDialogOpen(true);
+  };
+
+  const uniqueDays = [...new Set(schedules.map(s => s.day))].sort((a, b) => 
+    DAYS.indexOf(a) - DAYS.indexOf(b)
+  );
+
   const stats = {
     totalPlayers: players.length,
     paidPlayers: players.filter(p => p.payment_status === 'paid').length,
     pendingPlayers: players.filter(p => p.payment_status !== 'paid').length,
-    sessionsThisWeek: 6,
+    sessionsThisWeek: schedules.length,
   };
 
   return (
@@ -574,32 +683,147 @@ export default function AdminDashboard() {
             <Card className="border-none shadow-card">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Weekly Schedule</CardTitle>
-                <Badge variant="outline">{scheduleData.length} sessions</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{schedules.length} sessions</Badge>
+                  <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button onClick={openAddSchedule}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Session
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>{editingSchedule ? 'Edit Session' : 'Add New Session'}</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label>Day *</Label>
+                          <Select
+                            value={newSchedule.day}
+                            onValueChange={(value) => setNewSchedule({ ...newSchedule, day: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select day" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DAYS.map((day) => (
+                                <SelectItem key={day} value={day}>{day}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Time *</Label>
+                          <Select
+                            value={newSchedule.time}
+                            onValueChange={(value) => setNewSchedule({ ...newSchedule, time: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {TIMES.map((time) => (
+                                <SelectItem key={time} value={time}>{time}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Age Group *</Label>
+                          <Select
+                            value={newSchedule.age_group}
+                            onValueChange={(value) => setNewSchedule({ ...newSchedule, age_group: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select age group" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {AGE_GROUPS.map((age) => (
+                                <SelectItem key={age} value={age}>{age}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Session Type *</Label>
+                          <Select
+                            value={newSchedule.session_type}
+                            onValueChange={(value) => setNewSchedule({ ...newSchedule, session_type: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {SESSION_TYPES.map((type) => (
+                                <SelectItem key={type} value={type}>{type}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button 
+                          onClick={editingSchedule ? handleUpdateSchedule : handleAddSchedule} 
+                          className="w-full"
+                        >
+                          {editingSchedule ? 'Update Session' : 'Add Session'}
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4">
-                  {['Monday', 'Wednesday', 'Saturday'].map((day) => (
-                    <div key={day} className="space-y-2">
-                      <h3 className="font-medium text-foreground">{day}</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {scheduleData.filter(s => s.day === day).map((session, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                <Clock className="w-5 h-5 text-primary" />
+                {schedules.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No sessions scheduled. Add your first session above.
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {uniqueDays.map((day) => (
+                      <div key={day} className="space-y-2">
+                        <h3 className="font-medium text-foreground">{day}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {schedules.filter(s => s.day === day).map((session) => (
+                            <div key={session.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                  <Clock className="w-5 h-5 text-primary" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">{session.session_type}</p>
+                                  <p className="text-sm text-muted-foreground">Ages {session.age_group}</p>
+                                </div>
                               </div>
-                              <div>
-                                <p className="font-medium">{session.type}</p>
-                                <p className="text-sm text-muted-foreground">Ages {session.ageGroup}</p>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">{session.time}</Badge>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                      <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openEditSchedule(session)}>
+                                      <Edit className="w-4 h-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleDeleteSchedule(session.id)}
+                                      className="text-destructive"
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </div>
-                            <Badge variant="outline">{session.time}</Badge>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

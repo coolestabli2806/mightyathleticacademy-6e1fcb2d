@@ -88,6 +88,33 @@ export type Database = {
         }
         Relationships: []
       }
+      schedules: {
+        Row: {
+          age_group: string
+          created_at: string
+          day: string
+          id: string
+          session_type: string
+          time: string
+        }
+        Insert: {
+          age_group: string
+          created_at?: string
+          day: string
+          id?: string
+          session_type: string
+          time: string
+        }
+        Update: {
+          age_group?: string
+          created_at?: string
+          day?: string
+          id?: string
+          session_type?: string
+          time?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
