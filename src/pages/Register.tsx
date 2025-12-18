@@ -39,8 +39,14 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('add-to-sheets', {
-        body: formData,
+      const { error } = await supabase.from('registrations').insert({
+        child_name: formData.childName,
+        age: formData.age,
+        parent_name: formData.parentName,
+        email: formData.email,
+        phone: formData.phone,
+        experience: formData.experience || null,
+        notes: formData.notes || null,
       });
 
       if (error) throw error;
