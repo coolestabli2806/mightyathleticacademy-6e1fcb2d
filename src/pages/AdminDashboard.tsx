@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   Users, Calendar, DollarSign, CheckCircle, 
   LogOut, Plus, Search, MoreVertical, 
-  UserCheck, Clock, AlertCircle
+  UserCheck, Clock, AlertCircle, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,15 +16,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
-// Sample data
-const initialKids = [
-  { id: 1, name: "Alex Johnson", age: 10, parent: "Sarah Johnson", phone: "(555) 111-2222", email: "sarah@email.com", sessions: 3, paid: true },
-  { id: 2, name: "Emma Williams", age: 8, parent: "Mike Williams", phone: "(555) 333-4444", email: "mike@email.com", sessions: 2, paid: true },
-  { id: 3, name: "Lucas Brown", age: 12, parent: "Lisa Brown", phone: "(555) 555-6666", email: "lisa@email.com", sessions: 4, paid: false },
-  { id: 4, name: "Sophia Davis", age: 9, parent: "Tom Davis", phone: "(555) 777-8888", email: "tom@email.com", sessions: 1, paid: true },
-  { id: 5, name: "Noah Miller", age: 11, parent: "Amy Miller", phone: "(555) 999-0000", email: "amy@email.com", sessions: 0, paid: false },
-];
+interface Registration {
+  id: string;
+  child_name: string;
+  age: string;
+  parent_name: string;
+  email: string;
+  phone: string;
+  experience: string | null;
+  notes: string | null;
+  payment_status: string;
+  sessions_attended: number;
+  created_at: string;
+}
 
 const scheduleData = [
   { day: "Monday", time: "4:00 PM", ageGroup: "5-8", type: "Fundamentals" },
@@ -37,20 +43,38 @@ const scheduleData = [
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [kids, setKids] = useState(initialKids);
+  const [players, setPlayers] = useState<Registration[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newKid, setNewKid] = useState({
-    name: "", age: "", parent: "", phone: "", email: ""
+  const [newPlayer, setNewPlayer] = useState({
+    child_name: "", age: "", parent_name: "", phone: "", email: "", experience: ""
   });
 
   useEffect(() => {
-    // Check if admin is logged in (temporary - will be replaced with Supabase)
     const isAdmin = localStorage.getItem("isAdmin");
     if (!isAdmin) {
       navigate("/admin");
+    } else {
+      fetchPlayers();
     }
   }, [navigate]);
+
+  const fetchPlayers = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('registrations')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching players:', error);
+      toast({ title: "Error loading players", variant: "destructive" });
+    } else {
+      setPlayers(data || []);
+    }
+    setLoading(false);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("isAdmin");
@@ -58,62 +82,99 @@ export default function AdminDashboard() {
     navigate("/admin");
   };
 
-  const filteredKids = kids.filter(kid => 
-    kid.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    kid.parent.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredPlayers = players.filter(player => 
+    player.child_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    player.parent_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAddKid = () => {
-    if (!newKid.name || !newKid.age || !newKid.parent) {
+  const handleAddPlayer = async () => {
+    if (!newPlayer.child_name || !newPlayer.age || !newPlayer.parent_name) {
       toast({ title: "Please fill required fields", variant: "destructive" });
       return;
     }
-    const kid = {
-      id: kids.length + 1,
-      ...newKid,
-      age: parseInt(newKid.age),
-      sessions: 0,
-      paid: false,
-    };
-    setKids([...kids, kid]);
-    setNewKid({ name: "", age: "", parent: "", phone: "", email: "" });
-    setIsAddDialogOpen(false);
-    toast({ title: "Player added successfully!" });
+    
+    const { error } = await supabase.from('registrations').insert({
+      child_name: newPlayer.child_name,
+      age: newPlayer.age,
+      parent_name: newPlayer.parent_name,
+      phone: newPlayer.phone,
+      email: newPlayer.email,
+      experience: newPlayer.experience || null,
+    });
+
+    if (error) {
+      toast({ title: "Error adding player", variant: "destructive" });
+    } else {
+      setNewPlayer({ child_name: "", age: "", parent_name: "", phone: "", email: "", experience: "" });
+      setIsAddDialogOpen(false);
+      toast({ title: "Player added successfully!" });
+      fetchPlayers();
+    }
   };
 
-  const handleMarkAttendance = (kidId: number) => {
-    setKids(kids.map(kid => {
-      if (kid.id === kidId) {
-        const newSessions = kid.sessions + 1;
-        const needsPayment = newSessions >= 4;
-        return { 
-          ...kid, 
-          sessions: newSessions >= 4 ? 0 : newSessions,
-          paid: needsPayment ? false : kid.paid
-        };
-      }
-      return kid;
-    }));
-    toast({ title: "Attendance marked!" });
+  const handleMarkAttendance = async (playerId: string, currentSessions: number) => {
+    const newSessions = currentSessions >= 4 ? 1 : currentSessions + 1;
+    const needsPayment = currentSessions >= 3;
+    
+    const { error } = await supabase
+      .from('registrations')
+      .update({ 
+        sessions_attended: newSessions,
+        payment_status: needsPayment ? 'pending' : undefined
+      })
+      .eq('id', playerId);
+
+    if (error) {
+      toast({ title: "Error marking attendance", variant: "destructive" });
+    } else {
+      // Also record in attendance_records
+      await supabase.from('attendance_records').insert({
+        registration_id: playerId,
+        session_date: new Date().toISOString().split('T')[0]
+      });
+      toast({ title: "Attendance marked!" });
+      fetchPlayers();
+    }
   };
 
-  const handleTogglePayment = (kidId: number) => {
-    setKids(kids.map(kid => 
-      kid.id === kidId ? { ...kid, paid: !kid.paid } : kid
-    ));
-    const kid = kids.find(k => k.id === kidId);
-    toast({ title: kid?.paid ? "Marked as pending" : "Marked as paid" });
+  const handleTogglePayment = async (playerId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'paid' ? 'pending' : 'paid';
+    const resetSessions = newStatus === 'paid';
+    
+    const { error } = await supabase
+      .from('registrations')
+      .update({ 
+        payment_status: newStatus,
+        sessions_attended: resetSessions ? 0 : undefined
+      })
+      .eq('id', playerId);
+
+    if (error) {
+      toast({ title: "Error updating payment", variant: "destructive" });
+    } else {
+      toast({ title: newStatus === 'paid' ? "Marked as paid" : "Marked as pending" });
+      fetchPlayers();
+    }
   };
 
-  const handleDeleteKid = (kidId: number) => {
-    setKids(kids.filter(kid => kid.id !== kidId));
-    toast({ title: "Player removed" });
+  const handleDeletePlayer = async (playerId: string) => {
+    const { error } = await supabase
+      .from('registrations')
+      .delete()
+      .eq('id', playerId);
+
+    if (error) {
+      toast({ title: "Error removing player", variant: "destructive" });
+    } else {
+      toast({ title: "Player removed" });
+      fetchPlayers();
+    }
   };
 
   const stats = {
-    totalKids: kids.length,
-    paidKids: kids.filter(k => k.paid).length,
-    pendingKids: kids.filter(k => !k.paid).length,
+    totalPlayers: players.length,
+    paidPlayers: players.filter(p => p.payment_status === 'paid').length,
+    pendingPlayers: players.filter(p => p.payment_status !== 'paid').length,
     sessionsThisWeek: 6,
   };
 
@@ -126,10 +187,15 @@ export default function AdminDashboard() {
             <h1 className="font-heading font-bold text-xl text-foreground">Admin Dashboard</h1>
             <p className="text-sm text-muted-foreground">Mighty Athletic Academy - Coach David Maldonado</p>
           </div>
-          <Button variant="ghost" onClick={handleLogout}>
-            <LogOut className="w-4 h-4 mr-2" />
-            Logout
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={fetchPlayers}>
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+            <Button variant="ghost" onClick={handleLogout}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Logout
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -144,7 +210,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Total Players</p>
-                  <p className="font-heading font-bold text-2xl text-foreground">{stats.totalKids}</p>
+                  <p className="font-heading font-bold text-2xl text-foreground">{stats.totalPlayers}</p>
                 </div>
               </div>
             </CardContent>
@@ -158,7 +224,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Paid</p>
-                  <p className="font-heading font-bold text-2xl text-foreground">{stats.paidKids}</p>
+                  <p className="font-heading font-bold text-2xl text-foreground">{stats.paidPlayers}</p>
                 </div>
               </div>
             </CardContent>
@@ -172,7 +238,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Pending</p>
-                  <p className="font-heading font-bold text-2xl text-foreground">{stats.pendingKids}</p>
+                  <p className="font-heading font-bold text-2xl text-foreground">{stats.pendingPlayers}</p>
                 </div>
               </div>
             </CardContent>
@@ -244,16 +310,16 @@ export default function AdminDashboard() {
                         <div className="space-y-2">
                           <Label>Child's Name *</Label>
                           <Input
-                            value={newKid.name}
-                            onChange={(e) => setNewKid({ ...newKid, name: e.target.value })}
+                            value={newPlayer.child_name}
+                            onChange={(e) => setNewPlayer({ ...newPlayer, child_name: e.target.value })}
                             placeholder="Enter name"
                           />
                         </div>
                         <div className="space-y-2">
                           <Label>Age *</Label>
                           <Select
-                            value={newKid.age}
-                            onValueChange={(value) => setNewKid({ ...newKid, age: value })}
+                            value={newPlayer.age}
+                            onValueChange={(value) => setNewPlayer({ ...newPlayer, age: value })}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Select age" />
@@ -268,28 +334,28 @@ export default function AdminDashboard() {
                         <div className="space-y-2">
                           <Label>Parent Name *</Label>
                           <Input
-                            value={newKid.parent}
-                            onChange={(e) => setNewKid({ ...newKid, parent: e.target.value })}
+                            value={newPlayer.parent_name}
+                            onChange={(e) => setNewPlayer({ ...newPlayer, parent_name: e.target.value })}
                             placeholder="Parent/Guardian name"
                           />
                         </div>
                         <div className="space-y-2">
                           <Label>Phone</Label>
                           <Input
-                            value={newKid.phone}
-                            onChange={(e) => setNewKid({ ...newKid, phone: e.target.value })}
+                            value={newPlayer.phone}
+                            onChange={(e) => setNewPlayer({ ...newPlayer, phone: e.target.value })}
                             placeholder="(555) 123-4567"
                           />
                         </div>
                         <div className="space-y-2">
                           <Label>Email</Label>
                           <Input
-                            value={newKid.email}
-                            onChange={(e) => setNewKid({ ...newKid, email: e.target.value })}
+                            value={newPlayer.email}
+                            onChange={(e) => setNewPlayer({ ...newPlayer, email: e.target.value })}
                             placeholder="email@example.com"
                           />
                         </div>
-                        <Button onClick={handleAddKid} className="w-full">
+                        <Button onClick={handleAddPlayer} className="w-full">
                           Add Player
                         </Button>
                       </div>
@@ -298,77 +364,85 @@ export default function AdminDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Age</TableHead>
-                      <TableHead>Parent</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Sessions</TableHead>
-                      <TableHead>Payment</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredKids.map((kid) => (
-                      <TableRow key={kid.id}>
-                        <TableCell className="font-medium">{kid.name}</TableCell>
-                        <TableCell>{kid.age}</TableCell>
-                        <TableCell>{kid.parent}</TableCell>
-                        <TableCell>
-                          <div className="text-sm">
-                            <p>{kid.phone}</p>
-                            <p className="text-muted-foreground">{kid.email}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div className="flex gap-0.5">
-                              {[1, 2, 3, 4].map((s) => (
-                                <div
-                                  key={s}
-                                  className={`w-3 h-3 rounded-full ${s <= kid.sessions ? 'bg-primary' : 'bg-border'}`}
-                                />
-                              ))}
-                            </div>
-                            <span className="text-sm text-muted-foreground">{kid.sessions}/4</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={kid.paid ? "success" : "pending"}>
-                            {kid.paid ? "Paid" : "Pending"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleMarkAttendance(kid.id)}>
-                                <UserCheck className="w-4 h-4 mr-2" />
-                                Mark Attendance
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleTogglePayment(kid.id)}>
-                                <DollarSign className="w-4 h-4 mr-2" />
-                                Toggle Payment
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => handleDeleteKid(kid.id)}
-                                className="text-destructive"
-                              >
-                                Remove Player
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">Loading players...</div>
+                ) : filteredPlayers.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No players found. Registrations from the website will appear here.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Age</TableHead>
+                        <TableHead>Parent</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Sessions</TableHead>
+                        <TableHead>Payment</TableHead>
+                        <TableHead></TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPlayers.map((player) => (
+                        <TableRow key={player.id}>
+                          <TableCell className="font-medium">{player.child_name}</TableCell>
+                          <TableCell>{player.age}</TableCell>
+                          <TableCell>{player.parent_name}</TableCell>
+                          <TableCell>
+                            <div className="text-sm">
+                              <p>{player.phone}</p>
+                              <p className="text-muted-foreground">{player.email}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="flex gap-0.5">
+                                {[1, 2, 3, 4].map((s) => (
+                                  <div
+                                    key={s}
+                                    className={`w-3 h-3 rounded-full ${s <= player.sessions_attended ? 'bg-primary' : 'bg-border'}`}
+                                  />
+                                ))}
+                              </div>
+                              <span className="text-sm text-muted-foreground">{player.sessions_attended}/4</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={player.payment_status === 'paid' ? "success" : "pending"}>
+                              {player.payment_status === 'paid' ? "Paid" : "Pending"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleMarkAttendance(player.id, player.sessions_attended)}>
+                                  <UserCheck className="w-4 h-4 mr-2" />
+                                  Mark Attendance
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleTogglePayment(player.id, player.payment_status)}>
+                                  <DollarSign className="w-4 h-4 mr-2" />
+                                  Toggle Payment
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleDeletePlayer(player.id)}
+                                  className="text-destructive"
+                                >
+                                  Remove Player
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -380,44 +454,50 @@ export default function AdminDashboard() {
                 <CardTitle>Quick Attendance</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {kids.map((kid) => (
-                    <Card key={kid.id} className="border">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-foreground">{kid.name}</p>
-                            <p className="text-sm text-muted-foreground">Age {kid.age}</p>
-                          </div>
-                          <div className="text-right">
-                            <div className="flex gap-0.5 justify-end mb-2">
-                              {[1, 2, 3, 4].map((s) => (
-                                <div
-                                  key={s}
-                                  className={`w-4 h-4 rounded-full ${s <= kid.sessions ? 'bg-primary' : 'bg-border'}`}
-                                />
-                              ))}
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">Loading...</div>
+                ) : players.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No players registered yet.</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {players.map((player) => (
+                      <Card key={player.id} className="border">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-foreground">{player.child_name}</p>
+                              <p className="text-sm text-muted-foreground">Age {player.age}</p>
                             </div>
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleMarkAttendance(kid.id)}
-                              disabled={kid.sessions >= 4 && !kid.paid}
-                            >
-                              <UserCheck className="w-4 h-4 mr-1" />
-                              Mark
-                            </Button>
+                            <div className="text-right">
+                              <div className="flex gap-0.5 justify-end mb-2">
+                                {[1, 2, 3, 4].map((s) => (
+                                  <div
+                                    key={s}
+                                    className={`w-4 h-4 rounded-full ${s <= player.sessions_attended ? 'bg-primary' : 'bg-border'}`}
+                                  />
+                                ))}
+                              </div>
+                              <Button 
+                                size="sm" 
+                                variant={player.sessions_attended >= 4 ? "outline" : "default"}
+                                onClick={() => handleMarkAttendance(player.id, player.sessions_attended)}
+                              >
+                                <UserCheck className="w-4 h-4 mr-1" />
+                                Mark
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                        {kid.sessions >= 4 && !kid.paid && (
-                          <div className="mt-3 p-2 bg-pending/10 rounded-lg flex items-center gap-2 text-sm text-pending">
-                            <AlertCircle className="w-4 h-4" />
-                            Payment required for next cycle
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                          {player.sessions_attended >= 4 && (
+                            <div className="mt-3 pt-3 border-t flex items-center gap-2 text-pending">
+                              <AlertCircle className="w-4 h-4" />
+                              <span className="text-sm">Payment due</span>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -429,40 +509,62 @@ export default function AdminDashboard() {
                 <CardTitle>Payment Status</CardTitle>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Player</TableHead>
-                      <TableHead>Parent</TableHead>
-                      <TableHead>Sessions Completed</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {kids.map((kid) => (
-                      <TableRow key={kid.id}>
-                        <TableCell className="font-medium">{kid.name}</TableCell>
-                        <TableCell>{kid.parent}</TableCell>
-                        <TableCell>{kid.sessions}/4</TableCell>
-                        <TableCell>
-                          <Badge variant={kid.paid ? "success" : "pending"}>
-                            {kid.paid ? "Paid" : "Pending"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button 
-                            size="sm" 
-                            variant={kid.paid ? "outline" : "default"}
-                            onClick={() => handleTogglePayment(kid.id)}
-                          >
-                            {kid.paid ? "Mark Pending" : "Mark Paid"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">Loading...</div>
+                ) : players.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No players registered yet.</div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Pending Payments */}
+                    <div>
+                      <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-pending" />
+                        Pending Payments ({players.filter(p => p.payment_status !== 'paid').length})
+                      </h3>
+                      <div className="space-y-2">
+                        {players.filter(p => p.payment_status !== 'paid').map((player) => (
+                          <div key={player.id} className="flex items-center justify-between p-4 bg-pending/5 rounded-lg border border-pending/20">
+                            <div>
+                              <p className="font-medium">{player.child_name}</p>
+                              <p className="text-sm text-muted-foreground">{player.parent_name} • {player.sessions_attended}/4 sessions</p>
+                            </div>
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleTogglePayment(player.id, player.payment_status)}
+                            >
+                              Mark Paid
+                            </Button>
+                          </div>
+                        ))}
+                        {players.filter(p => p.payment_status !== 'paid').length === 0 && (
+                          <p className="text-muted-foreground text-center py-4">All payments are up to date!</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Paid */}
+                    <div>
+                      <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-success" />
+                        Paid ({players.filter(p => p.payment_status === 'paid').length})
+                      </h3>
+                      <div className="space-y-2">
+                        {players.filter(p => p.payment_status === 'paid').map((player) => (
+                          <div key={player.id} className="flex items-center justify-between p-4 bg-success/5 rounded-lg border border-success/20">
+                            <div>
+                              <p className="font-medium">{player.child_name}</p>
+                              <p className="text-sm text-muted-foreground">{player.parent_name}</p>
+                            </div>
+                            <Badge variant="success">Paid</Badge>
+                          </div>
+                        ))}
+                        {players.filter(p => p.payment_status === 'paid').length === 0 && (
+                          <p className="text-muted-foreground text-center py-4">No paid players yet.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -472,43 +574,32 @@ export default function AdminDashboard() {
             <Card className="border-none shadow-card">
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Weekly Schedule</CardTitle>
-                <Button variant="outline">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Session
-                </Button>
+                <Badge variant="outline">{scheduleData.length} sessions</Badge>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Day</TableHead>
-                      <TableHead>Time</TableHead>
-                      <TableHead>Age Group</TableHead>
-                      <TableHead>Session Type</TableHead>
-                      <TableHead></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {scheduleData.map((session, index) => (
-                      <TableRow key={index}>
-                        <TableCell className="font-medium">{session.day}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-muted-foreground" />
-                            {session.time}
+                <div className="grid gap-4">
+                  {['Monday', 'Wednesday', 'Saturday'].map((day) => (
+                    <div key={day} className="space-y-2">
+                      <h3 className="font-medium text-foreground">{day}</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {scheduleData.filter(s => s.day === day).map((session, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                <Clock className="w-5 h-5 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{session.type}</p>
+                                <p className="text-sm text-muted-foreground">Ages {session.ageGroup}</p>
+                              </div>
+                            </div>
+                            <Badge variant="outline">{session.time}</Badge>
                           </div>
-                        </TableCell>
-                        <TableCell>Ages {session.ageGroup}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{session.type}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm">Edit</Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

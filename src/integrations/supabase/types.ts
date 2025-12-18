@@ -14,6 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
+      attendance_records: {
+        Row: {
+          id: string
+          marked_at: string
+          notes: string | null
+          registration_id: string
+          session_date: string
+        }
+        Insert: {
+          id?: string
+          marked_at?: string
+          notes?: string | null
+          registration_id: string
+          session_date?: string
+        }
+        Update: {
+          id?: string
+          marked_at?: string
+          notes?: string | null
+          registration_id?: string
+          session_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registrations: {
         Row: {
           age: string
@@ -24,7 +56,9 @@ export type Database = {
           id: string
           notes: string | null
           parent_name: string
+          payment_status: string | null
           phone: string
+          sessions_attended: number | null
         }
         Insert: {
           age: string
@@ -35,7 +69,9 @@ export type Database = {
           id?: string
           notes?: string | null
           parent_name: string
+          payment_status?: string | null
           phone: string
+          sessions_attended?: number | null
         }
         Update: {
           age?: string
@@ -46,7 +82,9 @@ export type Database = {
           id?: string
           notes?: string | null
           parent_name?: string
+          payment_status?: string | null
           phone?: string
+          sessions_attended?: number | null
         }
         Relationships: []
       }
