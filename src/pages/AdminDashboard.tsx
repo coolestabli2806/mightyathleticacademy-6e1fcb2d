@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { User, Session } from "@supabase/supabase-js";
 
 interface Registration {
   id: string;
@@ -47,6 +48,8 @@ const SESSION_TYPES = ['Fundamentals', 'Skills', 'Games', 'Match', 'Training', '
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [players, setPlayers] = useState<Registration[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,13 +65,30 @@ export default function AdminDashboard() {
   });
 
   useEffect(() => {
-    const isAdmin = localStorage.getItem("isAdmin");
-    if (!isAdmin) {
-      navigate("/admin");
-    } else {
-      fetchPlayers();
-      fetchSchedules();
-    }
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (!session) {
+        navigate("/admin");
+      }
+    });
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (!session) {
+        navigate("/admin");
+      } else {
+        fetchPlayers();
+        fetchSchedules();
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
 
   const fetchPlayers = async () => {
@@ -100,8 +120,8 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("isAdmin");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     toast({ title: "Logged out successfully" });
     navigate("/admin");
   };
