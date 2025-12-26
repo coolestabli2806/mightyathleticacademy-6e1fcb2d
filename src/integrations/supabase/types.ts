@@ -46,6 +46,27 @@ export type Database = {
           },
         ]
       }
+      locations: {
+        Row: {
+          address: string | null
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       registrations: {
         Row: {
           age: string
@@ -94,6 +115,7 @@ export type Database = {
           created_at: string
           day: string
           id: string
+          location_id: string | null
           session_type: string
           time: string
         }
@@ -102,6 +124,7 @@ export type Database = {
           created_at?: string
           day: string
           id?: string
+          location_id?: string | null
           session_type: string
           time: string
         }
@@ -110,10 +133,19 @@ export type Database = {
           created_at?: string
           day?: string
           id?: string
+          location_id?: string | null
           session_type?: string
           time?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "schedules_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

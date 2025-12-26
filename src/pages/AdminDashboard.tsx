@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   Users, Calendar, DollarSign, CheckCircle, 
   LogOut, Plus, Search, MoreVertical, 
-  UserCheck, Clock, AlertCircle, RefreshCw, Trash2, Edit
+  UserCheck, Clock, AlertCircle, RefreshCw, Trash2, Edit, MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,22 @@ interface Schedule {
   time: string;
   age_group: string;
   session_type: string;
+  location_id: string | null;
+  locations?: { name: string; address: string | null };
+}
+
+interface Location {
+  id: string;
+  name: string;
+  address: string | null;
+}
+
+interface AttendanceRecord {
+  id: string;
+  registration_id: string;
+  session_date: string;
+  marked_at: string;
+  notes: string | null;
 }
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -52,17 +68,24 @@ export default function AdminDashboard() {
   const [session, setSession] = useState<Session | null>(null);
   const [players, setPlayers] = useState<Registration[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+  const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
+  const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState<Registration | null>(null);
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [newPlayer, setNewPlayer] = useState({
     child_name: "", age: "", parent_name: "", phone: "", email: "", experience: ""
   });
   const [newSchedule, setNewSchedule] = useState({
-    day: "", time: "", age_group: "", session_type: ""
+    day: "", time: "", age_group: "", session_type: "", location_id: ""
   });
+  const [newLocation, setNewLocation] = useState({ name: "", address: "" });
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -85,6 +108,8 @@ export default function AdminDashboard() {
       } else {
         fetchPlayers();
         fetchSchedules();
+        fetchLocations();
+        fetchAttendanceRecords();
       }
     });
 
@@ -110,13 +135,39 @@ export default function AdminDashboard() {
   const fetchSchedules = async () => {
     const { data, error } = await supabase
       .from('schedules')
-      .select('*')
+      .select('*, locations(name, address)')
       .order('day', { ascending: true });
 
     if (error) {
       console.error('Error fetching schedules:', error);
     } else {
       setSchedules(data || []);
+    }
+  };
+
+  const fetchLocations = async () => {
+    const { data, error } = await supabase
+      .from('locations')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching locations:', error);
+    } else {
+      setLocations(data || []);
+    }
+  };
+
+  const fetchAttendanceRecords = async () => {
+    const { data, error } = await supabase
+      .from('attendance_records')
+      .select('*')
+      .order('session_date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching attendance:', error);
+    } else {
+      setAttendanceRecords(data || []);
     }
   };
 
@@ -156,9 +207,17 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleMarkAttendance = async (playerId: string, currentSessions: number) => {
-    const newSessions = currentSessions >= 4 ? 1 : currentSessions + 1;
-    const needsPayment = currentSessions >= 3;
+  const openAttendanceDialog = (player: Registration) => {
+    setSelectedPlayer(player);
+    setAttendanceDate(new Date().toISOString().split('T')[0]);
+    setIsAttendanceDialogOpen(true);
+  };
+
+  const handleMarkAttendance = async () => {
+    if (!selectedPlayer) return;
+    
+    const newSessions = selectedPlayer.sessions_attended >= 8 ? 1 : selectedPlayer.sessions_attended + 1;
+    const needsPayment = selectedPlayer.sessions_attended >= 7;
     
     const { error } = await supabase
       .from('registrations')
@@ -166,19 +225,26 @@ export default function AdminDashboard() {
         sessions_attended: newSessions,
         payment_status: needsPayment ? 'pending' : undefined
       })
-      .eq('id', playerId);
+      .eq('id', selectedPlayer.id);
 
     if (error) {
       toast({ title: "Error marking attendance", variant: "destructive" });
     } else {
-      // Also record in attendance_records
+      // Also record in attendance_records with selected date
       await supabase.from('attendance_records').insert({
-        registration_id: playerId,
-        session_date: new Date().toISOString().split('T')[0]
+        registration_id: selectedPlayer.id,
+        session_date: attendanceDate
       });
-      toast({ title: "Attendance marked!" });
+      toast({ title: "Attendance marked for " + attendanceDate });
+      setIsAttendanceDialogOpen(false);
+      setSelectedPlayer(null);
       fetchPlayers();
+      fetchAttendanceRecords();
     }
+  };
+
+  const getPlayerAttendance = (playerId: string) => {
+    return attendanceRecords.filter(r => r.registration_id === playerId);
   };
 
   const handleTogglePayment = async (playerId: string, currentStatus: string) => {
@@ -226,12 +292,13 @@ export default function AdminDashboard() {
       time: newSchedule.time,
       age_group: newSchedule.age_group,
       session_type: newSchedule.session_type,
+      location_id: newSchedule.location_id || null,
     });
 
     if (error) {
       toast({ title: "Error adding session", variant: "destructive" });
     } else {
-      setNewSchedule({ day: "", time: "", age_group: "", session_type: "" });
+      setNewSchedule({ day: "", time: "", age_group: "", session_type: "", location_id: "" });
       setIsScheduleDialogOpen(false);
       toast({ title: "Session added!" });
       fetchSchedules();
@@ -251,13 +318,14 @@ export default function AdminDashboard() {
         time: newSchedule.time,
         age_group: newSchedule.age_group,
         session_type: newSchedule.session_type,
+        location_id: newSchedule.location_id || null,
       })
       .eq('id', editingSchedule.id);
 
     if (error) {
       toast({ title: "Error updating session", variant: "destructive" });
     } else {
-      setNewSchedule({ day: "", time: "", age_group: "", session_type: "" });
+      setNewSchedule({ day: "", time: "", age_group: "", session_type: "", location_id: "" });
       setEditingSchedule(null);
       setIsScheduleDialogOpen(false);
       toast({ title: "Session updated!" });
@@ -279,6 +347,41 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleAddLocation = async () => {
+    if (!newLocation.name) {
+      toast({ title: "Please enter location name", variant: "destructive" });
+      return;
+    }
+    
+    const { error } = await supabase.from('locations').insert({
+      name: newLocation.name,
+      address: newLocation.address || null,
+    });
+
+    if (error) {
+      toast({ title: "Error adding location", variant: "destructive" });
+    } else {
+      setNewLocation({ name: "", address: "" });
+      setIsLocationDialogOpen(false);
+      toast({ title: "Location added!" });
+      fetchLocations();
+    }
+  };
+
+  const handleDeleteLocation = async (locationId: string) => {
+    const { error } = await supabase
+      .from('locations')
+      .delete()
+      .eq('id', locationId);
+
+    if (error) {
+      toast({ title: "Error removing location", variant: "destructive" });
+    } else {
+      toast({ title: "Location removed" });
+      fetchLocations();
+    }
+  };
+
   const openEditSchedule = (schedule: Schedule) => {
     setEditingSchedule(schedule);
     setNewSchedule({
@@ -286,13 +389,14 @@ export default function AdminDashboard() {
       time: schedule.time,
       age_group: schedule.age_group,
       session_type: schedule.session_type,
+      location_id: schedule.location_id || "",
     });
     setIsScheduleDialogOpen(true);
   };
 
   const openAddSchedule = () => {
     setEditingSchedule(null);
-    setNewSchedule({ day: "", time: "", age_group: "", session_type: "" });
+    setNewSchedule({ day: "", time: "", age_group: "", session_type: "", location_id: "" });
     setIsScheduleDialogOpen(true);
   };
 
@@ -406,6 +510,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="schedule" className="gap-2">
               <Calendar className="w-4 h-4" />
               Schedule
+            </TabsTrigger>
+            <TabsTrigger value="locations" className="gap-2">
+              <MapPin className="w-4 h-4" />
+              Locations
             </TabsTrigger>
           </TabsList>
 
@@ -527,14 +635,14 @@ export default function AdminDashboard() {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <div className="flex gap-0.5">
-                                {[1, 2, 3, 4].map((s) => (
+                                {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
                                   <div
                                     key={s}
-                                    className={`w-3 h-3 rounded-full ${s <= player.sessions_attended ? 'bg-primary' : 'bg-border'}`}
+                                    className={`w-2 h-2 rounded-full ${s <= player.sessions_attended ? 'bg-primary' : 'bg-border'}`}
                                   />
                                 ))}
                               </div>
-                              <span className="text-sm text-muted-foreground">{player.sessions_attended}/4</span>
+                              <span className="text-sm text-muted-foreground">{player.sessions_attended}/8</span>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -550,7 +658,7 @@ export default function AdminDashboard() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleMarkAttendance(player.id, player.sessions_attended)}>
+                                <DropdownMenuItem onClick={() => openAttendanceDialog(player)}>
                                   <UserCheck className="w-4 h-4 mr-2" />
                                   Mark Attendance
                                 </DropdownMenuItem>
@@ -599,27 +707,40 @@ export default function AdminDashboard() {
                             </div>
                             <div className="text-right">
                               <div className="flex gap-0.5 justify-end mb-2">
-                                {[1, 2, 3, 4].map((s) => (
+                                {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
                                   <div
                                     key={s}
-                                    className={`w-4 h-4 rounded-full ${s <= player.sessions_attended ? 'bg-primary' : 'bg-border'}`}
+                                    className={`w-3 h-3 rounded-full ${s <= player.sessions_attended ? 'bg-primary' : 'bg-border'}`}
                                   />
                                 ))}
                               </div>
                               <Button 
                                 size="sm" 
-                                variant={player.sessions_attended >= 4 ? "outline" : "default"}
-                                onClick={() => handleMarkAttendance(player.id, player.sessions_attended)}
+                                variant={player.sessions_attended >= 8 ? "outline" : "default"}
+                                onClick={() => openAttendanceDialog(player)}
                               >
                                 <UserCheck className="w-4 h-4 mr-1" />
                                 Mark
                               </Button>
                             </div>
                           </div>
-                          {player.sessions_attended >= 4 && (
+                          {player.sessions_attended >= 8 && (
                             <div className="mt-3 pt-3 border-t flex items-center gap-2 text-pending">
                               <AlertCircle className="w-4 h-4" />
                               <span className="text-sm">Payment due</span>
+                            </div>
+                          )}
+                          {/* Attendance History */}
+                          {getPlayerAttendance(player.id).length > 0 && (
+                            <div className="mt-3 pt-3 border-t">
+                              <p className="text-xs text-muted-foreground mb-2">Recent attendance:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {getPlayerAttendance(player.id).slice(0, 5).map((record) => (
+                                  <Badge key={record.id} variant="outline" className="text-xs">
+                                    {new Date(record.session_date).toLocaleDateString()}
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </CardContent>
@@ -655,7 +776,7 @@ export default function AdminDashboard() {
                           <div key={player.id} className="flex items-center justify-between p-4 bg-pending/5 rounded-lg border border-pending/20">
                             <div>
                               <p className="font-medium">{player.child_name}</p>
-                              <p className="text-sm text-muted-foreground">{player.parent_name} • {player.sessions_attended}/4 sessions</p>
+                              <p className="text-sm text-muted-foreground">{player.parent_name} • {player.sessions_attended}/8 sessions</p>
                             </div>
                             <Button 
                               size="sm" 
@@ -781,6 +902,22 @@ export default function AdminDashboard() {
                             </SelectContent>
                           </Select>
                         </div>
+                        <div className="space-y-2">
+                          <Label>Location</Label>
+                          <Select
+                            value={newSchedule.location_id}
+                            onValueChange={(value) => setNewSchedule({ ...newSchedule, location_id: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select location" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {locations.map((loc) => (
+                                <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <Button 
                           onClick={editingSchedule ? handleUpdateSchedule : handleAddSchedule} 
                           className="w-full"
@@ -812,6 +949,12 @@ export default function AdminDashboard() {
                                 <div>
                                   <p className="font-medium">{session.session_type}</p>
                                   <p className="text-sm text-muted-foreground">Ages {session.age_group}</p>
+                                  {session.locations && (
+                                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                                      <MapPin className="w-3 h-3" />
+                                      {session.locations.name}
+                                    </p>
+                                  )}
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -847,7 +990,113 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Locations Tab */}
+          <TabsContent value="locations">
+            <Card className="border-none shadow-card">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Training Locations</CardTitle>
+                <Dialog open={isLocationDialogOpen} onOpenChange={setIsLocationDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Location
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add New Location</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label>Location Name *</Label>
+                        <Input
+                          value={newLocation.name}
+                          onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
+                          placeholder="e.g. Deep Run Park"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Address</Label>
+                        <Input
+                          value={newLocation.address}
+                          onChange={(e) => setNewLocation({ ...newLocation, address: e.target.value })}
+                          placeholder="Full address (optional)"
+                        />
+                      </div>
+                      <Button onClick={handleAddLocation} className="w-full">
+                        Add Location
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {locations.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No locations added. Add your first location above.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {locations.map((location) => (
+                      <div key={location.id} className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <MapPin className="w-5 h-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{location.name}</p>
+                            {location.address && (
+                              <p className="text-sm text-muted-foreground">{location.address}</p>
+                            )}
+                          </div>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleDeleteLocation(location.id)}
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
+
+        {/* Attendance Dialog */}
+        <Dialog open={isAttendanceDialogOpen} onOpenChange={setIsAttendanceDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Mark Attendance for {selectedPlayer?.child_name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Session Date *</Label>
+                <Input
+                  type="date"
+                  value={attendanceDate}
+                  onChange={(e) => setAttendanceDate(e.target.value)}
+                />
+              </div>
+              <div className="p-4 bg-muted/30 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Current sessions: <span className="font-medium text-foreground">{selectedPlayer?.sessions_attended || 0}/8</span>
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  After marking: <span className="font-medium text-foreground">{((selectedPlayer?.sessions_attended || 0) >= 8 ? 1 : (selectedPlayer?.sessions_attended || 0) + 1)}/8</span>
+                </p>
+              </div>
+              <Button onClick={handleMarkAttendance} className="w-full">
+                <UserCheck className="w-4 h-4 mr-2" />
+                Mark Attendance
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
