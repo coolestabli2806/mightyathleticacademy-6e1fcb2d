@@ -5,12 +5,19 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, MapPin, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
+interface Location {
+  name: string;
+  address: string | null;
+}
+
 interface Schedule {
   id: string;
   day: string;
   time: string;
   age_group: string;
   session_type: string;
+  location_id: string | null;
+  locations: Location | null;
 }
 
 const DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -45,7 +52,7 @@ export default function Schedule() {
   const fetchSchedules = async () => {
     const { data, error } = await supabase
       .from('schedules')
-      .select('*');
+      .select('*, locations(name, address)');
 
     if (error) {
       console.error('Error fetching schedules:', error);
@@ -69,6 +76,12 @@ export default function Schedule() {
     (a, b) => DAYS_ORDER.indexOf(a) - DAYS_ORDER.indexOf(b)
   );
 
+  // Get unique locations from schedules
+  const uniqueLocations = [...new Set(schedules
+    .filter(s => s.locations)
+    .map(s => s.locations?.name)
+  )].filter(Boolean);
+
   return (
     <Layout>
       <section className="py-20 bg-secondary min-h-screen">
@@ -88,19 +101,23 @@ export default function Schedule() {
           </div>
 
           {/* Location Info */}
-          <Card className="max-w-2xl mx-auto mb-8 border-none shadow-card">
-            <CardContent className="p-6 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-hero flex items-center justify-center">
-                <MapPin className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h3 className="font-heading font-semibold text-foreground">Training Location</h3>
-                <p className="text-muted-foreground text-sm">
-                  Deep Run Park / Glover Park
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {uniqueLocations.length > 0 && (
+            <Card className="max-w-2xl mx-auto mb-8 border-none shadow-card">
+              <CardContent className="p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-hero flex items-center justify-center shrink-0">
+                    <MapPin className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="font-heading font-semibold text-foreground">Training Locations</h3>
+                    <p className="text-muted-foreground text-sm">
+                      {uniqueLocations.join(' / ')}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Schedule Grid */}
           {loading ? (
@@ -138,6 +155,12 @@ export default function Schedule() {
                             <Badge variant={getTypeColor(session.session_type) as any} className="mt-1">
                               {session.session_type}
                             </Badge>
+                            {session.locations && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-2">
+                                <MapPin className="w-3 h-3" />
+                                {session.locations.name}
+                              </p>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -155,7 +178,7 @@ export default function Schedule() {
                 Payment Information
               </h3>
               <p className="text-muted-foreground">
-                Sessions are billed in blocks of 4. Payment is due before the first session of each block.
+                Sessions are billed in blocks of 8. Payment is due before the first session of each block.
               </p>
             </CardContent>
           </Card>
