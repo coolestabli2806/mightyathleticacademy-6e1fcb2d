@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { 
   Users, Calendar, DollarSign, CheckCircle, 
   LogOut, Plus, Search, MoreVertical, 
-  UserCheck, Clock, AlertCircle, RefreshCw, Trash2, Edit, MapPin
+  UserCheck, Clock, AlertCircle, RefreshCw, Trash2, Edit, MapPin,
+  Camera, Heart, History
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
+import { Textarea } from "@/components/ui/textarea";
 
 interface Registration {
   id: string;
@@ -57,6 +59,26 @@ interface AttendanceRecord {
   notes: string | null;
 }
 
+interface GalleryItem {
+  id: string;
+  title: string;
+  description: string | null;
+  type: string;
+  file_url: string;
+  thumbnail_url: string | null;
+  created_at: string;
+}
+
+interface Sponsor {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  description: string | null;
+  website_url: string | null;
+  display_order: number;
+  is_active: boolean;
+}
+
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const TIMES = ['8:00 AM', '9:00 AM', '10:00 AM', '10:30 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM', '6:00 PM'];
 const AGE_GROUPS = ['5-8', '9-12', '13-16', 'All Ages'];
@@ -79,6 +101,18 @@ export default function AdminDashboard() {
   const [selectedPlayer, setSelectedPlayer] = useState<Registration | null>(null);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
+  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [isGalleryDialogOpen, setIsGalleryDialogOpen] = useState(false);
+  const [isSponsorDialogOpen, setIsSponsorDialogOpen] = useState(false);
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [selectedPlayerHistory, setSelectedPlayerHistory] = useState<Registration | null>(null);
+  const [galleryUploading, setGalleryUploading] = useState(false);
+  const [sponsorUploading, setSponsorUploading] = useState(false);
+  const [newGalleryItem, setNewGalleryItem] = useState({ title: "", description: "", type: "photo" });
+  const [newSponsor, setNewSponsor] = useState({ name: "", description: "", website_url: "" });
+  const [galleryFile, setGalleryFile] = useState<File | null>(null);
+  const [sponsorLogo, setSponsorLogo] = useState<File | null>(null);
   const [newPlayer, setNewPlayer] = useState({
     child_name: "", age: "", parent_name: "", phone: "", email: "", experience: ""
   });
@@ -110,6 +144,8 @@ export default function AdminDashboard() {
         fetchSchedules();
         fetchLocations();
         fetchAttendanceRecords();
+        fetchGalleryItems();
+        fetchSponsors();
       }
     });
 
@@ -168,6 +204,32 @@ export default function AdminDashboard() {
       console.error('Error fetching attendance:', error);
     } else {
       setAttendanceRecords(data || []);
+    }
+  };
+
+  const fetchGalleryItems = async () => {
+    const { data, error } = await supabase
+      .from('gallery_items')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching gallery:', error);
+    } else {
+      setGalleryItems(data || []);
+    }
+  };
+
+  const fetchSponsors = async () => {
+    const { data, error } = await supabase
+      .from('sponsors')
+      .select('*')
+      .order('display_order', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching sponsors:', error);
+    } else {
+      setSponsors(data || []);
     }
   };
 
@@ -400,6 +462,159 @@ export default function AdminDashboard() {
     setIsScheduleDialogOpen(true);
   };
 
+  const openHistoryDialog = (player: Registration) => {
+    setSelectedPlayerHistory(player);
+    setIsHistoryDialogOpen(true);
+  };
+
+  const handleAddGalleryItem = async () => {
+    if (!newGalleryItem.title || !galleryFile) {
+      toast({ title: "Please provide title and file", variant: "destructive" });
+      return;
+    }
+
+    setGalleryUploading(true);
+    
+    // Upload file to storage
+    const fileExt = galleryFile.name.split('.').pop();
+    const fileName = `${Date.now()}.${fileExt}`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('gallery')
+      .upload(fileName, galleryFile);
+
+    if (uploadError) {
+      toast({ title: "Error uploading file", variant: "destructive" });
+      setGalleryUploading(false);
+      return;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage.from('gallery').getPublicUrl(fileName);
+
+    // Insert gallery item
+    const { error } = await supabase.from('gallery_items').insert({
+      title: newGalleryItem.title,
+      description: newGalleryItem.description || null,
+      type: newGalleryItem.type,
+      file_url: urlData.publicUrl,
+    });
+
+    if (error) {
+      toast({ title: "Error adding gallery item", variant: "destructive" });
+    } else {
+      setNewGalleryItem({ title: "", description: "", type: "photo" });
+      setGalleryFile(null);
+      setIsGalleryDialogOpen(false);
+      toast({ title: "Gallery item added!" });
+      fetchGalleryItems();
+    }
+    setGalleryUploading(false);
+  };
+
+  const handleDeleteGalleryItem = async (itemId: string, fileUrl: string) => {
+    // Extract filename from URL
+    const fileName = fileUrl.split('/').pop();
+    
+    // Delete from storage
+    if (fileName) {
+      await supabase.storage.from('gallery').remove([fileName]);
+    }
+
+    // Delete from database
+    const { error } = await supabase.from('gallery_items').delete().eq('id', itemId);
+
+    if (error) {
+      toast({ title: "Error removing item", variant: "destructive" });
+    } else {
+      toast({ title: "Item removed" });
+      fetchGalleryItems();
+    }
+  };
+
+  const handleAddSponsor = async () => {
+    if (!newSponsor.name) {
+      toast({ title: "Please provide sponsor name", variant: "destructive" });
+      return;
+    }
+
+    setSponsorUploading(true);
+    let logoUrl = null;
+
+    // Upload logo if provided
+    if (sponsorLogo) {
+      const fileExt = sponsorLogo.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('sponsors')
+        .upload(fileName, sponsorLogo);
+
+      if (uploadError) {
+        toast({ title: "Error uploading logo", variant: "destructive" });
+        setSponsorUploading(false);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from('sponsors').getPublicUrl(fileName);
+      logoUrl = urlData.publicUrl;
+    }
+
+    // Insert sponsor
+    const { error } = await supabase.from('sponsors').insert({
+      name: newSponsor.name,
+      description: newSponsor.description || null,
+      website_url: newSponsor.website_url || null,
+      logo_url: logoUrl,
+      display_order: sponsors.length,
+    });
+
+    if (error) {
+      toast({ title: "Error adding sponsor", variant: "destructive" });
+    } else {
+      setNewSponsor({ name: "", description: "", website_url: "" });
+      setSponsorLogo(null);
+      setIsSponsorDialogOpen(false);
+      toast({ title: "Sponsor added!" });
+      fetchSponsors();
+    }
+    setSponsorUploading(false);
+  };
+
+  const handleDeleteSponsor = async (sponsorId: string, logoUrl: string | null) => {
+    // Delete logo from storage
+    if (logoUrl) {
+      const fileName = logoUrl.split('/').pop();
+      if (fileName) {
+        await supabase.storage.from('sponsors').remove([fileName]);
+      }
+    }
+
+    // Delete from database
+    const { error } = await supabase.from('sponsors').delete().eq('id', sponsorId);
+
+    if (error) {
+      toast({ title: "Error removing sponsor", variant: "destructive" });
+    } else {
+      toast({ title: "Sponsor removed" });
+      fetchSponsors();
+    }
+  };
+
+  const handleToggleSponsorActive = async (sponsorId: string, currentActive: boolean) => {
+    const { error } = await supabase
+      .from('sponsors')
+      .update({ is_active: !currentActive })
+      .eq('id', sponsorId);
+
+    if (error) {
+      toast({ title: "Error updating sponsor", variant: "destructive" });
+    } else {
+      toast({ title: currentActive ? "Sponsor hidden" : "Sponsor visible" });
+      fetchSponsors();
+    }
+  };
+
   const uniqueDays = [...new Set(schedules.map(s => s.day))].sort((a, b) => 
     DAYS.indexOf(a) - DAYS.indexOf(b)
   );
@@ -494,7 +709,7 @@ export default function AdminDashboard() {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="players" className="space-y-6">
-          <TabsList className="bg-card p-1">
+          <TabsList className="bg-card p-1 flex-wrap h-auto">
             <TabsTrigger value="players" className="gap-2">
               <Users className="w-4 h-4" />
               Players
@@ -502,6 +717,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="attendance" className="gap-2">
               <UserCheck className="w-4 h-4" />
               Attendance
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2">
+              <History className="w-4 h-4" />
+              History
             </TabsTrigger>
             <TabsTrigger value="payments" className="gap-2">
               <DollarSign className="w-4 h-4" />
@@ -514,6 +733,14 @@ export default function AdminDashboard() {
             <TabsTrigger value="locations" className="gap-2">
               <MapPin className="w-4 h-4" />
               Locations
+            </TabsTrigger>
+            <TabsTrigger value="gallery" className="gap-2">
+              <Camera className="w-4 h-4" />
+              Gallery
+            </TabsTrigger>
+            <TabsTrigger value="sponsors" className="gap-2">
+              <Heart className="w-4 h-4" />
+              Sponsors
             </TabsTrigger>
           </TabsList>
 
@@ -1065,6 +1292,262 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Gallery Tab */}
+          <TabsContent value="gallery">
+            <Card className="border-none shadow-card">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Gallery Management</CardTitle>
+                <Dialog open={isGalleryDialogOpen} onOpenChange={setIsGalleryDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Media
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add Photo/Video</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label>Title *</Label>
+                        <Input
+                          value={newGalleryItem.title}
+                          onChange={(e) => setNewGalleryItem({ ...newGalleryItem, title: e.target.value })}
+                          placeholder="e.g. Training Session"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Textarea
+                          value={newGalleryItem.description}
+                          onChange={(e) => setNewGalleryItem({ ...newGalleryItem, description: e.target.value })}
+                          placeholder="Optional description"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Type *</Label>
+                        <Select
+                          value={newGalleryItem.type}
+                          onValueChange={(value) => setNewGalleryItem({ ...newGalleryItem, type: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="photo">Photo</SelectItem>
+                            <SelectItem value="video">Video</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>File *</Label>
+                        <Input
+                          type="file"
+                          accept={newGalleryItem.type === 'photo' ? 'image/*' : 'video/*'}
+                          onChange={(e) => setGalleryFile(e.target.files?.[0] || null)}
+                        />
+                      </div>
+                      <Button onClick={handleAddGalleryItem} className="w-full" disabled={galleryUploading}>
+                        {galleryUploading ? "Uploading..." : "Add to Gallery"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {galleryItems.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No gallery items. Add photos and videos above.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {galleryItems.map((item) => (
+                      <div key={item.id} className="relative group rounded-lg overflow-hidden border">
+                        {item.type === 'photo' ? (
+                          <img src={item.file_url} alt={item.title} className="w-full h-48 object-cover" />
+                        ) : (
+                          <video src={item.file_url} className="w-full h-48 object-cover" />
+                        )}
+                        <div className="p-3">
+                          <p className="font-medium text-sm">{item.title}</p>
+                          <p className="text-xs text-muted-foreground">{item.type}</p>
+                        </div>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleDeleteGalleryItem(item.id, item.file_url)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Sponsors Tab */}
+          <TabsContent value="sponsors">
+            <Card className="border-none shadow-card">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Sponsors Management</CardTitle>
+                <Dialog open={isSponsorDialogOpen} onOpenChange={setIsSponsorDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Sponsor
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Add New Sponsor</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label>Sponsor Name *</Label>
+                        <Input
+                          value={newSponsor.name}
+                          onChange={(e) => setNewSponsor({ ...newSponsor, name: e.target.value })}
+                          placeholder="e.g. Local Sports Store"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Textarea
+                          value={newSponsor.description}
+                          onChange={(e) => setNewSponsor({ ...newSponsor, description: e.target.value })}
+                          placeholder="About this sponsor..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Website URL</Label>
+                        <Input
+                          value={newSponsor.website_url}
+                          onChange={(e) => setNewSponsor({ ...newSponsor, website_url: e.target.value })}
+                          placeholder="https://..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Logo (optional)</Label>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => setSponsorLogo(e.target.files?.[0] || null)}
+                        />
+                      </div>
+                      <Button onClick={handleAddSponsor} className="w-full" disabled={sponsorUploading}>
+                        {sponsorUploading ? "Uploading..." : "Add Sponsor"}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {sponsors.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No sponsors added yet. Add your first sponsor above.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {sponsors.map((sponsor) => (
+                      <div key={sponsor.id} className={`flex items-center justify-between p-4 rounded-lg border ${sponsor.is_active ? 'bg-muted/30' : 'bg-muted/10 opacity-60'}`}>
+                        <div className="flex items-center gap-3">
+                          {sponsor.logo_url ? (
+                            <img src={sponsor.logo_url} alt={sponsor.name} className="w-12 h-12 object-contain rounded" />
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <Heart className="w-6 h-6 text-primary" />
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium">{sponsor.name}</p>
+                            {sponsor.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-1">{sponsor.description}</p>
+                            )}
+                            {!sponsor.is_active && (
+                              <Badge variant="outline" className="mt-1">Hidden</Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleToggleSponsorActive(sponsor.id, sponsor.is_active)}
+                          >
+                            {sponsor.is_active ? 'Hide' : 'Show'}
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            onClick={() => handleDeleteSponsor(sponsor.id, sponsor.logo_url)}
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Attendance History Tab */}
+          <TabsContent value="history">
+            <Card className="border-none shadow-card">
+              <CardHeader>
+                <CardTitle>Complete Attendance History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {players.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No players registered yet.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {players.map((player) => {
+                      const playerAttendance = getPlayerAttendance(player.id);
+                      return (
+                        <Card key={player.id} className="border">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <div>
+                                <p className="font-medium text-foreground">{player.child_name}</p>
+                                <p className="text-sm text-muted-foreground">Age {player.age} • {playerAttendance.length} total sessions</p>
+                              </div>
+                              <Button size="sm" variant="outline" onClick={() => openHistoryDialog(player)}>
+                                <History className="w-4 h-4 mr-2" />
+                                View All
+                              </Button>
+                            </div>
+                            {playerAttendance.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No attendance recorded yet.</p>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {playerAttendance.slice(0, 10).map((record) => (
+                                  <Badge key={record.id} variant="outline" className="text-xs">
+                                    {new Date(record.session_date).toLocaleDateString()}
+                                  </Badge>
+                                ))}
+                                {playerAttendance.length > 10 && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    +{playerAttendance.length - 10} more
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* Attendance Dialog */}
@@ -1094,6 +1577,39 @@ export default function AdminDashboard() {
                 <UserCheck className="w-4 h-4 mr-2" />
                 Mark Attendance
               </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* History Dialog */}
+        <Dialog open={isHistoryDialogOpen} onOpenChange={setIsHistoryDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Attendance History - {selectedPlayerHistory?.child_name}</DialogTitle>
+            </DialogHeader>
+            <div className="mt-4 max-h-96 overflow-y-auto">
+              {selectedPlayerHistory && getPlayerAttendance(selectedPlayerHistory.id).length === 0 ? (
+                <p className="text-muted-foreground text-center py-4">No attendance records.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Marked At</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedPlayerHistory && getPlayerAttendance(selectedPlayerHistory.id).map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell>{new Date(record.session_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(record.marked_at).toLocaleString()}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </div>
           </DialogContent>
         </Dialog>

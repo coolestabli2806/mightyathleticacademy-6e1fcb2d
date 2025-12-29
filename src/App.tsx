@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Register from "./pages/Register";
 import Schedule from "./pages/Schedule";
 import Gallery from "./pages/Gallery";
+import Sponsors from "./pages/Sponsors";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/register" element={<Register />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/gallery" element={<Gallery />} />
+          <Route path="/sponsors" element={<Sponsors />} />
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

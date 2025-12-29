@@ -46,6 +46,36 @@ export type Database = {
           },
         ]
       }
+      gallery_items: {
+        Row: {
+          created_at: string
+          description: string | null
+          file_url: string
+          id: string
+          thumbnail_url: string | null
+          title: string
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          file_url: string
+          id?: string
+          thumbnail_url?: string | null
+          title: string
+          type?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          file_url?: string
+          id?: string
+          thumbnail_url?: string | null
+          title?: string
+          type?: string
+        }
+        Relationships: []
+      }
       locations: {
         Row: {
           address: string | null
@@ -146,6 +176,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sponsors: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          logo_url: string | null
+          name: string
+          website_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name: string
+          website_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          name?: string
+          website_url?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
