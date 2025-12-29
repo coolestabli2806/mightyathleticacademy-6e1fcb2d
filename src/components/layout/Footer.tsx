@@ -35,6 +35,9 @@ export function Footer() {
               <Link to="/gallery" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
                 Photo Gallery
               </Link>
+              <Link to="/sponsors" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+                Our Sponsors
+              </Link>
             </div>
           </div>
 

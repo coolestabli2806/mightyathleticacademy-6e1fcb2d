@@ -1,39 +1,51 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Camera, Video, X, Play } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
-// Sample gallery data
-const photos = [
-  { id: 1, title: "Training Session", date: "Dec 2024" },
-  { id: 2, title: "Team Practice", date: "Dec 2024" },
-  { id: 3, title: "Skills Drill", date: "Nov 2024" },
-  { id: 4, title: "Match Day", date: "Nov 2024" },
-  { id: 5, title: "Warm Up", date: "Nov 2024" },
-  { id: 6, title: "Goal Celebration", date: "Oct 2024" },
-];
-
-const videos = [
-  { id: 1, title: "Highlights Reel", duration: "2:34" },
-  { id: 2, title: "Skills Tutorial", duration: "5:12" },
-  { id: 3, title: "Team Intro", duration: "1:45" },
-];
-
-// Generate placeholder colors for demo
-const getPlaceholderColor = (id: number) => {
-  const colors = [
-    "from-primary/20 to-primary/40",
-    "from-accent/20 to-accent/40",
-    "from-success/20 to-success/40",
-  ];
-  return colors[id % colors.length];
-};
+interface GalleryItem {
+  id: string;
+  title: string;
+  description: string | null;
+  type: string;
+  file_url: string;
+  thumbnail_url: string | null;
+  created_at: string;
+}
 
 export default function Gallery() {
-  const [selectedImage, setSelectedImage] = useState<number | null>(null);
+  const [selectedImage, setSelectedImage] = useState<GalleryItem | null>(null);
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchGalleryItems();
+  }, []);
+
+  const fetchGalleryItems = async () => {
+    const { data, error } = await supabase
+      .from('gallery_items')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching gallery:', error);
+    } else {
+      setGalleryItems(data || []);
+    }
+    setLoading(false);
+  };
+
+  const photos = galleryItems.filter(item => item.type === 'photo');
+  const videos = galleryItems.filter(item => item.type === 'video');
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  };
 
   return (
     <Layout>
@@ -56,71 +68,90 @@ export default function Gallery() {
             <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
               <TabsTrigger value="photos" className="gap-2">
                 <Camera className="w-4 h-4" />
-                Photos
+                Photos ({photos.length})
               </TabsTrigger>
               <TabsTrigger value="videos" className="gap-2">
                 <Video className="w-4 h-4" />
-                Videos
+                Videos ({videos.length})
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="photos">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {photos.map((photo) => (
-                  <Card 
-                    key={photo.id}
-                    className="overflow-hidden border-none shadow-card cursor-pointer group hover:shadow-card-hover transition-all duration-300"
-                    onClick={() => setSelectedImage(photo.id)}
-                  >
-                    <div className={`aspect-[4/3] bg-gradient-to-br ${getPlaceholderColor(photo.id)} flex items-center justify-center relative`}>
-                      <Camera className="w-12 h-12 text-muted-foreground/40" />
-                      <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/10 transition-colors" />
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-medium text-foreground">{photo.title}</h3>
-                      <p className="text-sm text-muted-foreground">{photo.date}</p>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-
-              <div className="text-center mt-12">
-                <p className="text-muted-foreground mb-4">
-                  Photos are added regularly after training sessions.
-                </p>
-                <Button variant="outline">
-                  Load More Photos
-                </Button>
-              </div>
+              {loading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              ) : photos.length === 0 ? (
+                <div className="text-center py-12">
+                  <Camera className="w-16 h-16 text-muted-foreground/40 mx-auto mb-4" />
+                  <p className="text-muted-foreground">No photos yet. Check back soon!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {photos.map((photo) => (
+                    <Card 
+                      key={photo.id}
+                      className="overflow-hidden border-none shadow-card cursor-pointer group hover:shadow-card-hover transition-all duration-300"
+                      onClick={() => setSelectedImage(photo)}
+                    >
+                      <div className="aspect-[4/3] relative overflow-hidden">
+                        <img 
+                          src={photo.file_url} 
+                          alt={photo.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                        <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/10 transition-colors" />
+                      </div>
+                      <div className="p-4">
+                        <h3 className="font-medium text-foreground">{photo.title}</h3>
+                        <p className="text-sm text-muted-foreground">{formatDate(photo.created_at)}</p>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="videos">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {videos.map((video) => (
-                  <Card 
-                    key={video.id}
-                    className="overflow-hidden border-none shadow-card cursor-pointer group hover:shadow-card-hover transition-all duration-300"
-                  >
-                    <div className={`aspect-video bg-gradient-to-br ${getPlaceholderColor(video.id)} flex items-center justify-center relative`}>
-                      <div className="w-16 h-16 rounded-full bg-primary/90 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <Play className="w-6 h-6 text-primary-foreground ml-1" />
+              {loading ? (
+                <div className="text-center py-8 text-muted-foreground">Loading...</div>
+              ) : videos.length === 0 ? (
+                <div className="text-center py-12">
+                  <Video className="w-16 h-16 text-muted-foreground/40 mx-auto mb-4" />
+                  <p className="text-muted-foreground">No videos yet. Check back soon!</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {videos.map((video) => (
+                    <Card 
+                      key={video.id}
+                      className="overflow-hidden border-none shadow-card cursor-pointer group hover:shadow-card-hover transition-all duration-300"
+                      onClick={() => window.open(video.file_url, '_blank')}
+                    >
+                      <div className="aspect-video relative overflow-hidden">
+                        {video.thumbnail_url ? (
+                          <img 
+                            src={video.thumbnail_url} 
+                            alt={video.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center" />
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-16 h-16 rounded-full bg-primary/90 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Play className="w-6 h-6 text-primary-foreground ml-1" />
+                          </div>
+                        </div>
                       </div>
-                      <span className="absolute bottom-3 right-3 bg-foreground/80 text-primary-foreground text-xs px-2 py-1 rounded">
-                        {video.duration}
-                      </span>
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-medium text-foreground">{video.title}</h3>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-
-              <div className="text-center mt-12">
-                <p className="text-muted-foreground">
-                  More videos coming soon! Stay tuned for highlights and tutorials.
-                </p>
-              </div>
+                      <div className="p-4">
+                        <h3 className="font-medium text-foreground">{video.title}</h3>
+                        {video.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-1">{video.description}</p>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>
@@ -135,9 +166,21 @@ export default function Gallery() {
           >
             <X className="w-5 h-5" />
           </button>
-          <div className={`aspect-[4/3] bg-gradient-to-br ${selectedImage ? getPlaceholderColor(selectedImage) : ""} flex items-center justify-center`}>
-            <Camera className="w-24 h-24 text-muted-foreground/40" />
-          </div>
+          {selectedImage && (
+            <div>
+              <img 
+                src={selectedImage.file_url} 
+                alt={selectedImage.title}
+                className="w-full max-h-[80vh] object-contain bg-black"
+              />
+              <div className="p-4 bg-card">
+                <h3 className="font-medium text-foreground">{selectedImage.title}</h3>
+                {selectedImage.description && (
+                  <p className="text-sm text-muted-foreground mt-1">{selectedImage.description}</p>
+                )}
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </Layout>
