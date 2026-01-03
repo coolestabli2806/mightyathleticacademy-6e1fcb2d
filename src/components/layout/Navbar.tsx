@@ -9,6 +9,7 @@ const navLinks = [
   { href: "/schedule", label: "Schedule" },
   { href: "/gallery", label: "Gallery" },
   { href: "/register", label: "Register" },
+  { href: "/sponsors", label: "Our Sponsors" },
 ];
 
 export function Navbar() {
