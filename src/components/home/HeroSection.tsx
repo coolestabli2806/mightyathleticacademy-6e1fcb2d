@@ -1,9 +1,31 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Users, Calendar, Trophy } from "lucide-react";
+import { ArrowRight, Users, Calendar, Trophy, Handshake } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import heroImage from "@/assets/hero-soccer.jpg";
 
+interface Sponsor {
+  id: string;
+  name: string;
+  logo_url: string | null;
+}
+
 export function HeroSection() {
+  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+
+  useEffect(() => {
+    const fetchSponsors = async () => {
+      const { data } = await supabase
+        .from("sponsors")
+        .select("id, name, logo_url")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true });
+      if (data) setSponsors(data);
+    };
+    fetchSponsors();
+  }, []);
+
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden">
       {/* Background Image */}
@@ -72,6 +94,38 @@ export function HeroSection() {
               <span className="text-sm text-primary-foreground/70">Dedicated</span>
             </div>
           </div>
+
+          {/* Sponsors on Hero */}
+          {sponsors.length > 0 && (
+            <div className="mt-10 pt-6 border-t border-primary-foreground/20 animate-fade-in" style={{ animationDelay: "0.4s" }}>
+              <div className="flex items-center gap-2 mb-4">
+                <Handshake className="w-4 h-4 text-accent" />
+                <span className="text-sm font-medium text-primary-foreground/70">Our Partners</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-6">
+                {sponsors.map((sponsor) => (
+                  <Link
+                    key={sponsor.id}
+                    to={`/sponsors#${sponsor.id}`}
+                    className="group transition-all duration-300 hover:scale-105"
+                    title={sponsor.name}
+                  >
+                    {sponsor.logo_url ? (
+                      <img
+                        src={sponsor.logo_url}
+                        alt={sponsor.name}
+                        className="h-10 md:h-12 w-auto object-contain brightness-0 invert opacity-70 group-hover:opacity-100 transition-opacity duration-300"
+                      />
+                    ) : (
+                      <div className="h-10 md:h-12 px-4 rounded bg-primary-foreground/10 flex items-center justify-center text-primary-foreground/70 text-sm font-medium group-hover:bg-primary-foreground/20 transition-colors">
+                        {sponsor.name}
+                      </div>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>
