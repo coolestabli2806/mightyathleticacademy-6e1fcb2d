@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Heart, ExternalLink } from "lucide-react";
@@ -17,10 +18,28 @@ interface Sponsor {
 export default function Sponsors() {
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
 
   useEffect(() => {
     fetchSponsors();
   }, []);
+
+  useEffect(() => {
+    // Scroll to sponsor if hash is present
+    if (location.hash && !loading && sponsors.length > 0) {
+      const sponsorId = location.hash.replace('#', '');
+      const element = document.getElementById(`sponsor-${sponsorId}`);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+          }, 2000);
+        }, 100);
+      }
+    }
+  }, [location.hash, loading, sponsors]);
 
   const fetchSponsors = async () => {
     const { data, error } = await supabase
@@ -75,7 +94,7 @@ export default function Sponsors() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
               {sponsors.map((sponsor) => (
-                <Card key={sponsor.id} className="border-none shadow-card hover:shadow-card-hover transition-all duration-300">
+                <Card key={sponsor.id} id={`sponsor-${sponsor.id}`} className="border-none shadow-card hover:shadow-card-hover transition-all duration-300">
                   <CardContent className="p-6">
                     {sponsor.logo_url ? (
                       <div className="h-32 flex items-center justify-center mb-4 bg-background rounded-lg p-4">
