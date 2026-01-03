@@ -60,8 +60,20 @@ export default function AdminLogin() {
     setIsLoading(false);
   };
 
+  const ADMIN_EMAIL = "mightyathleticacademy@gmail.com";
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (resetEmail.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+      toast({
+        title: "Incorrect Email ID",
+        description: "The email entered is not a valid admin email.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
