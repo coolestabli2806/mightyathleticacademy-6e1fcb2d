@@ -40,12 +40,12 @@ export function HeroSection() {
 
       {/* Sponsors on Hero - Top Right */}
       {sponsors.length > 0 && (
-        <div className="absolute top-6 right-6 z-20 animate-fade-in">
-          <div className="flex items-center gap-2 mb-3">
-            <Handshake className="w-4 h-4 text-accent" />
-            <span className="text-sm font-medium text-primary-foreground/80">Our Partners</span>
+        <div className="absolute top-8 right-8 z-20 animate-fade-in">
+          <div className="flex items-center gap-3 mb-4">
+            <Handshake className="w-7 h-7 text-accent" />
+            <span className="text-lg font-semibold text-primary-foreground/90">Our Partners</span>
           </div>
-          <div className="flex flex-wrap items-center gap-4 max-w-xs justify-end">
+          <div className="flex flex-wrap items-center gap-6 max-w-md justify-end">
             {sponsors.map((sponsor) => (
               <Link
                 key={sponsor.id}
@@ -57,10 +57,10 @@ export function HeroSection() {
                   <img
                     src={sponsor.logo_url}
                     alt={sponsor.name}
-                    className="h-8 md:h-10 w-auto object-contain bg-white/90 rounded px-2 py-1 group-hover:bg-white transition-colors duration-300"
+                    className="h-14 md:h-[70px] w-auto object-contain bg-white/90 rounded-lg px-3 py-2 group-hover:bg-white transition-colors duration-300"
                   />
                 ) : (
-                  <div className="h-8 md:h-10 px-3 rounded bg-white/90 flex items-center justify-center text-foreground text-xs font-medium group-hover:bg-white transition-colors">
+                  <div className="h-14 md:h-[70px] px-5 rounded-lg bg-white/90 flex items-center justify-center text-foreground text-sm font-medium group-hover:bg-white transition-colors">
                     {sponsor.name}
                   </div>
                 )}
