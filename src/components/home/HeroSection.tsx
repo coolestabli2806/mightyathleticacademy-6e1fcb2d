@@ -40,7 +40,7 @@ export function HeroSection() {
 
       {/* Sponsors on Hero - Top Right */}
       {sponsors.length > 0 && (
-        <div className="absolute top-8 right-8 z-20 animate-fade-in">
+        <div className="hidden lg:block absolute top-8 right-8 z-20 animate-fade-in">
           <div className="flex items-center gap-3 mb-4">
             <Handshake className="w-7 h-7 text-accent" />
             <span className="text-lg font-semibold text-primary-foreground/90">Our Partners</span>
