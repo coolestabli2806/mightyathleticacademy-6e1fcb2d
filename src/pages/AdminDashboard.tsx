@@ -1058,7 +1058,37 @@ export default function AdminDashboard() {
                     onClick={() => {
                       const emails = players.map(p => p.email).filter(Boolean).join(',');
                       const subject = encodeURIComponent('Schedule for the Week');
-                      window.open(`https://mail.google.com/mail/?view=cm&to=${emails}&su=${subject}`, '_blank');
+                      
+                      // Group schedules by day
+                      const schedulesByDay = DAYS.reduce((acc, day) => {
+                        const daySessions = schedules.filter(s => s.day === day);
+                        if (daySessions.length > 0) {
+                          acc[day] = daySessions;
+                        }
+                        return acc;
+                      }, {} as Record<string, Schedule[]>);
+                      
+                      // Format schedule details
+                      let bodyText = 'Dear Parents,\n\nHere is the training schedule for the week:\n\n';
+                      
+                      Object.entries(schedulesByDay).forEach(([day, sessions]) => {
+                        bodyText += `${day}:\n`;
+                        sessions.forEach(session => {
+                          const locationName = session.locations?.name || 'TBD';
+                          bodyText += `  • ${session.time} - ${session.session_type} (Ages ${session.age_group}) at ${locationName}\n`;
+                        });
+                        bodyText += '\n';
+                      });
+                      
+                      if (Object.keys(schedulesByDay).length === 0) {
+                        bodyText += 'No sessions scheduled for this week.\n\n';
+                      }
+                      
+                      bodyText += 'Please ensure your child arrives 10 minutes early with proper gear.\n\n';
+                      bodyText += 'Thank you,\nCoach Maldonado';
+                      
+                      const body = encodeURIComponent(bodyText);
+                      window.open(`https://mail.google.com/mail/?view=cm&to=${emails}&su=${subject}&body=${body}`, '_blank');
                     }}
                   >
                     <Send className="w-4 h-4 mr-2" />
