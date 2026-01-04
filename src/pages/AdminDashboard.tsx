@@ -4,7 +4,7 @@ import {
   Users, Calendar, DollarSign, CheckCircle, 
   LogOut, Plus, Search, MoreVertical, 
   UserCheck, Clock, AlertCircle, RefreshCw, Trash2, Edit, MapPin,
-  Camera, Heart, History
+  Camera, Heart, History, Send
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1053,6 +1053,17 @@ export default function AdminDashboard() {
                 <CardTitle>Weekly Schedule</CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline">{schedules.length} sessions</Badge>
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      const emails = players.map(p => p.email).filter(Boolean).join(',');
+                      const subject = encodeURIComponent('Schedule for the Week');
+                      window.open(`https://mail.google.com/mail/?view=cm&to=${emails}&su=${subject}`, '_blank');
+                    }}
+                  >
+                    <Send className="w-4 h-4 mr-2" />
+                    Publish
+                  </Button>
                   <Dialog open={isScheduleDialogOpen} onOpenChange={setIsScheduleDialogOpen}>
                     <DialogTrigger asChild>
                       <Button onClick={openAddSchedule}>
