@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import heic2any from "heic2any";
 import { useNavigate } from "react-router-dom";
 import { 
   Users, Calendar, DollarSign, CheckCircle, 
@@ -597,13 +598,33 @@ export default function AdminDashboard() {
 
     setGalleryUploading(true);
     
-    // Upload file to storage
-    const fileExt = galleryFile.name.split('.').pop();
+    let fileToUpload: File | Blob = galleryFile;
+    let fileExt = galleryFile.name.split('.').pop()?.toLowerCase();
+    
+    // Convert HEIC/HEIF to JPG
+    if (fileExt === 'heic' || fileExt === 'heif') {
+      try {
+        toast({ title: "Converting HEIC to JPG...", description: "Please wait" });
+        const convertedBlob = await heic2any({
+          blob: galleryFile,
+          toType: "image/jpeg",
+          quality: 0.9
+        });
+        fileToUpload = Array.isArray(convertedBlob) ? convertedBlob[0] : convertedBlob;
+        fileExt = 'jpg';
+      } catch (conversionError) {
+        console.error("HEIC conversion error:", conversionError);
+        toast({ title: "Error converting HEIC file", description: "Please try uploading a JPG or PNG instead", variant: "destructive" });
+        setGalleryUploading(false);
+        return;
+      }
+    }
+    
     const fileName = `${Date.now()}.${fileExt}`;
     
     const { error: uploadError } = await supabase.storage
       .from('gallery')
-      .upload(fileName, galleryFile);
+      .upload(fileName, fileToUpload);
 
     if (uploadError) {
       toast({ title: "Error uploading file", variant: "destructive" });
