@@ -120,6 +120,11 @@ export default function AdminDashboard() {
     day: "", time: "", age_group: "", session_type: "", location_id: ""
   });
   const [newLocation, setNewLocation] = useState({ name: "", address: "" });
+  const [editingPlayer, setEditingPlayer] = useState<Registration | null>(null);
+  const [isEditPlayerDialogOpen, setIsEditPlayerDialogOpen] = useState(false);
+  const [editingAttendance, setEditingAttendance] = useState<AttendanceRecord | null>(null);
+  const [isEditAttendanceDialogOpen, setIsEditAttendanceDialogOpen] = useState(false);
+  const [editAttendanceDate, setEditAttendanceDate] = useState("");
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -442,6 +447,123 @@ export default function AdminDashboard() {
       toast({ title: "Location removed" });
       fetchLocations();
     }
+  };
+
+  const openEditPlayer = (player: Registration) => {
+    setEditingPlayer(player);
+    setNewPlayer({
+      child_name: player.child_name,
+      age: player.age,
+      parent_name: player.parent_name,
+      phone: player.phone,
+      email: player.email,
+      experience: player.experience || "",
+    });
+    setIsEditPlayerDialogOpen(true);
+  };
+
+  const handleUpdatePlayer = async () => {
+    if (!editingPlayer || !newPlayer.child_name || !newPlayer.age || !newPlayer.parent_name) {
+      toast({ title: "Please fill required fields", variant: "destructive" });
+      return;
+    }
+    
+    const { error } = await supabase
+      .from('registrations')
+      .update({
+        child_name: newPlayer.child_name,
+        age: newPlayer.age,
+        parent_name: newPlayer.parent_name,
+        phone: newPlayer.phone,
+        email: newPlayer.email,
+        experience: newPlayer.experience || null,
+      })
+      .eq('id', editingPlayer.id);
+
+    if (error) {
+      toast({ title: "Error updating player", variant: "destructive" });
+    } else {
+      setNewPlayer({ child_name: "", age: "", parent_name: "", phone: "", email: "", experience: "" });
+      setEditingPlayer(null);
+      setIsEditPlayerDialogOpen(false);
+      toast({ title: "Player updated successfully!" });
+      fetchPlayers();
+    }
+  };
+
+  const openEditAttendance = (record: AttendanceRecord) => {
+    setEditingAttendance(record);
+    setEditAttendanceDate(record.session_date);
+    setIsEditAttendanceDialogOpen(true);
+  };
+
+  const handleUpdateAttendance = async () => {
+    if (!editingAttendance || !editAttendanceDate) {
+      toast({ title: "Please select a date", variant: "destructive" });
+      return;
+    }
+    
+    const { error } = await supabase
+      .from('attendance_records')
+      .update({ session_date: editAttendanceDate })
+      .eq('id', editingAttendance.id);
+
+    if (error) {
+      toast({ title: "Error updating attendance", variant: "destructive" });
+    } else {
+      setEditingAttendance(null);
+      setIsEditAttendanceDialogOpen(false);
+      toast({ title: "Attendance updated!" });
+      fetchAttendanceRecords();
+    }
+  };
+
+  const handleDeleteAttendance = async (recordId: string, playerId: string) => {
+    const { error: deleteError } = await supabase
+      .from('attendance_records')
+      .delete()
+      .eq('id', recordId);
+
+    if (deleteError) {
+      toast({ title: "Error deleting attendance", variant: "destructive" });
+      return;
+    }
+
+    // Decrement sessions_attended for the player
+    const player = players.find(p => p.id === playerId);
+    if (player && player.sessions_attended > 0) {
+      await supabase
+        .from('registrations')
+        .update({ sessions_attended: player.sessions_attended - 1 })
+        .eq('id', playerId);
+    }
+
+    toast({ title: "Attendance record deleted" });
+    fetchAttendanceRecords();
+    fetchPlayers();
+  };
+
+  // Calculate payment block history based on attendance records
+  const getPaymentBlockHistory = (playerId: string) => {
+    const playerAttendance = attendanceRecords
+      .filter(r => r.registration_id === playerId)
+      .sort((a, b) => new Date(a.session_date).getTime() - new Date(b.session_date).getTime());
+    
+    const blocks: { blockNumber: number; startDate: string; endDate: string; sessions: number }[] = [];
+    
+    for (let i = 0; i < playerAttendance.length; i += 8) {
+      const blockRecords = playerAttendance.slice(i, i + 8);
+      if (blockRecords.length > 0) {
+        blocks.push({
+          blockNumber: Math.floor(i / 8) + 1,
+          startDate: blockRecords[0].session_date,
+          endDate: blockRecords[blockRecords.length - 1].session_date,
+          sessions: blockRecords.length
+        });
+      }
+    }
+    
+    return blocks.slice(-8); // Return last 8 blocks
   };
 
   const openEditSchedule = (schedule: Schedule) => {
@@ -885,6 +1007,10 @@ export default function AdminDashboard() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => openEditPlayer(player)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit Player
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => openAttendanceDialog(player)}>
                                   <UserCheck className="w-4 h-4 mr-2" />
                                   Mark Attendance
@@ -957,15 +1083,37 @@ export default function AdminDashboard() {
                               <span className="text-sm">Payment due</span>
                             </div>
                           )}
-                          {/* Attendance History */}
+                          {/* Attendance History with Edit/Delete */}
                           {getPlayerAttendance(player.id).length > 0 && (
                             <div className="mt-3 pt-3 border-t">
                               <p className="text-xs text-muted-foreground mb-2">Recent attendance:</p>
                               <div className="flex flex-wrap gap-1">
                                 {getPlayerAttendance(player.id).slice(0, 5).map((record) => (
-                                  <Badge key={record.id} variant="outline" className="text-xs">
-                                    {new Date(record.session_date).toLocaleDateString()}
-                                  </Badge>
+                                  <div key={record.id} className="flex items-center gap-1">
+                                    <Badge variant="outline" className="text-xs pr-1">
+                                      {new Date(record.session_date).toLocaleDateString()}
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" size="icon" className="h-4 w-4 ml-1">
+                                            <MoreVertical className="w-3 h-3" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={() => openEditAttendance(record)}>
+                                            <Edit className="w-3 h-3 mr-2" />
+                                            Edit Date
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem 
+                                            onClick={() => handleDeleteAttendance(record.id, player.id)}
+                                            className="text-destructive"
+                                          >
+                                            <Trash2 className="w-3 h-3 mr-2" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </Badge>
+                                  </div>
                                 ))}
                               </div>
                             </div>
@@ -1037,6 +1185,57 @@ export default function AdminDashboard() {
                         ))}
                         {players.filter(p => p.payment_status === 'paid').length === 0 && (
                           <p className="text-muted-foreground text-center py-4">No paid players yet.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Payment Block History */}
+                    <div>
+                      <h3 className="font-medium text-foreground mb-4 flex items-center gap-2">
+                        <History className="w-4 h-4 text-primary" />
+                        Payment Block History (Last 8 Blocks per Player)
+                      </h3>
+                      <div className="space-y-4">
+                        {players.map((player) => {
+                          const blockHistory = getPaymentBlockHistory(player.id);
+                          if (blockHistory.length === 0) return null;
+                          
+                          return (
+                            <div key={player.id} className="p-4 bg-muted/30 rounded-lg border">
+                              <p className="font-medium mb-3">{player.child_name}</p>
+                              <div className="overflow-x-auto">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="text-xs">Block #</TableHead>
+                                      <TableHead className="text-xs">Start Date</TableHead>
+                                      <TableHead className="text-xs">End Date</TableHead>
+                                      <TableHead className="text-xs">Sessions</TableHead>
+                                      <TableHead className="text-xs">Status</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {blockHistory.map((block) => (
+                                      <TableRow key={block.blockNumber}>
+                                        <TableCell className="text-xs">{block.blockNumber}</TableCell>
+                                        <TableCell className="text-xs">{new Date(block.startDate).toLocaleDateString()}</TableCell>
+                                        <TableCell className="text-xs">{new Date(block.endDate).toLocaleDateString()}</TableCell>
+                                        <TableCell className="text-xs">{block.sessions}/8</TableCell>
+                                        <TableCell>
+                                          <Badge variant={block.sessions === 8 ? "success" : "outline"} className="text-xs">
+                                            {block.sessions === 8 ? "Complete" : "In Progress"}
+                                          </Badge>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {players.every(p => getPaymentBlockHistory(p.id).length === 0) && (
+                          <p className="text-muted-foreground text-center py-4">No attendance history available yet.</p>
                         )}
                       </div>
                     </div>
@@ -1651,6 +1850,104 @@ export default function AdminDashboard() {
                   </TableBody>
                 </Table>
               )}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Player Dialog */}
+        <Dialog open={isEditPlayerDialogOpen} onOpenChange={(open) => {
+          setIsEditPlayerDialogOpen(open);
+          if (!open) {
+            setEditingPlayer(null);
+            setNewPlayer({ child_name: "", age: "", parent_name: "", phone: "", email: "", experience: "" });
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Player</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Child's Name *</Label>
+                <Input
+                  value={newPlayer.child_name}
+                  onChange={(e) => setNewPlayer({ ...newPlayer, child_name: e.target.value })}
+                  placeholder="Enter name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Age *</Label>
+                <Select
+                  value={newPlayer.age}
+                  onValueChange={(value) => setNewPlayer({ ...newPlayer, age: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select age" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map((age) => (
+                      <SelectItem key={age} value={age.toString()}>{age} years</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Parent Name *</Label>
+                <Input
+                  value={newPlayer.parent_name}
+                  onChange={(e) => setNewPlayer({ ...newPlayer, parent_name: e.target.value })}
+                  placeholder="Parent/Guardian name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input
+                  value={newPlayer.phone}
+                  onChange={(e) => setNewPlayer({ ...newPlayer, phone: e.target.value })}
+                  placeholder="(555) 123-4567"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  value={newPlayer.email}
+                  onChange={(e) => setNewPlayer({ ...newPlayer, email: e.target.value })}
+                  placeholder="email@example.com"
+                />
+              </div>
+              <Button onClick={handleUpdatePlayer} className="w-full">
+                <Edit className="w-4 h-4 mr-2" />
+                Update Player
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Attendance Dialog */}
+        <Dialog open={isEditAttendanceDialogOpen} onOpenChange={(open) => {
+          setIsEditAttendanceDialogOpen(open);
+          if (!open) {
+            setEditingAttendance(null);
+            setEditAttendanceDate("");
+          }
+        }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit Attendance Date</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Session Date *</Label>
+                <Input
+                  type="date"
+                  value={editAttendanceDate}
+                  onChange={(e) => setEditAttendanceDate(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleUpdateAttendance} className="w-full">
+                <Edit className="w-4 h-4 mr-2" />
+                Update Attendance
+              </Button>
             </div>
           </DialogContent>
         </Dialog>
