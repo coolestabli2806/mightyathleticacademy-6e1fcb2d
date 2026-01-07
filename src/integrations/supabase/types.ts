@@ -102,6 +102,7 @@ export type Database = {
           age: string
           child_name: string
           created_at: string
+          date_of_birth: string
           email: string
           experience: string | null
           id: string
@@ -115,6 +116,7 @@ export type Database = {
           age: string
           child_name: string
           created_at?: string
+          date_of_birth?: string
           email: string
           experience?: string | null
           id?: string
@@ -128,6 +130,7 @@ export type Database = {
           age?: string
           child_name?: string
           created_at?: string
+          date_of_birth?: string
           email?: string
           experience?: string | null
           id?: string

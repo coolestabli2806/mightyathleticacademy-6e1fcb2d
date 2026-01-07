@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { format } from "date-fns";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,16 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "@/hooks/use-toast";
-import { CheckCircle, UserPlus, Loader2 } from "lucide-react";
+import { CheckCircle, UserPlus, Loader2, CalendarIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 export default function Register() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     childName: "",
-    age: "",
+    dateOfBirth: undefined as Date | undefined,
     parentName: "",
     email: "",
     phone: "",
@@ -27,7 +31,7 @@ export default function Register() {
     e.preventDefault();
     
     // Basic validation
-    if (!formData.childName || !formData.age || !formData.parentName || !formData.email || !formData.phone) {
+    if (!formData.childName || !formData.dateOfBirth || !formData.parentName || !formData.email || !formData.phone) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields.",
@@ -36,12 +40,22 @@ export default function Register() {
       return;
     }
 
+    // Calculate age from date of birth
+    const today = new Date();
+    const birthDate = formData.dateOfBirth;
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
     setIsLoading(true);
 
     try {
       const { error } = await supabase.from('registrations').insert({
         child_name: formData.childName,
-        age: formData.age,
+        date_of_birth: format(formData.dateOfBirth, 'yyyy-MM-dd'),
+        age: age.toString(),
         parent_name: formData.parentName,
         email: formData.email,
         phone: formData.phone,
@@ -131,22 +145,34 @@ export default function Register() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="age">Age *</Label>
-                    <Select
-                      value={formData.age}
-                      onValueChange={(value) => setFormData({ ...formData, age: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select age" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map((age) => (
-                          <SelectItem key={age} value={age.toString()}>
-                            {age} years old
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label>Date of Birth *</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !formData.dateOfBirth && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {formData.dateOfBirth ? format(formData.dateOfBirth, "PPP") : <span>Select date of birth</span>}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={formData.dateOfBirth}
+                          onSelect={(date) => setFormData({ ...formData, dateOfBirth: date })}
+                          disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                          initialFocus
+                          className={cn("p-3 pointer-events-auto")}
+                          captionLayout="dropdown-buttons"
+                          fromYear={2005}
+                          toYear={new Date().getFullYear()}
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
 
