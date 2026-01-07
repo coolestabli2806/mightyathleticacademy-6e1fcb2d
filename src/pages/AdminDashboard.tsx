@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
+import { format } from "date-fns";
 import heic2any from "heic2any";
 import { useNavigate } from "react-router-dom";
 import { 
   Users, Calendar, DollarSign, CheckCircle, 
   LogOut, Plus, Search, MoreVertical, 
   UserCheck, Clock, AlertCircle, RefreshCw, Trash2, Edit, MapPin,
-  Camera, Heart, History, Send
+  Camera, Heart, History, Send, CalendarIcon
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,15 +18,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 interface Registration {
   id: string;
   child_name: string;
   age: string;
+  date_of_birth: string;
   parent_name: string;
   email: string;
   phone: string;
@@ -115,7 +120,7 @@ export default function AdminDashboard() {
   const [galleryFile, setGalleryFile] = useState<File | null>(null);
   const [sponsorLogo, setSponsorLogo] = useState<File | null>(null);
   const [newPlayer, setNewPlayer] = useState({
-    child_name: "", age: "", parent_name: "", phone: "", email: "", experience: ""
+    child_name: "", age: "", date_of_birth: undefined as Date | undefined, parent_name: "", phone: "", email: "", experience: ""
   });
   const [newSchedule, setNewSchedule] = useState({
     day: "", time: "", age_group: "", session_type: "", location_id: ""
@@ -251,14 +256,24 @@ export default function AdminDashboard() {
   );
 
   const handleAddPlayer = async () => {
-    if (!newPlayer.child_name || !newPlayer.age || !newPlayer.parent_name) {
-      toast({ title: "Please fill required fields", variant: "destructive" });
+    if (!newPlayer.child_name || !newPlayer.date_of_birth || !newPlayer.parent_name) {
+      toast({ title: "Please fill required fields (Name, DOB, Parent)", variant: "destructive" });
       return;
+    }
+
+    // Calculate age from date of birth
+    const today = new Date();
+    const birthDate = newPlayer.date_of_birth;
+    let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      calculatedAge--;
     }
     
     const { error } = await supabase.from('registrations').insert({
       child_name: newPlayer.child_name,
-      age: newPlayer.age,
+      date_of_birth: format(newPlayer.date_of_birth, 'yyyy-MM-dd'),
+      age: calculatedAge.toString(),
       parent_name: newPlayer.parent_name,
       phone: newPlayer.phone,
       email: newPlayer.email,
@@ -268,7 +283,7 @@ export default function AdminDashboard() {
     if (error) {
       toast({ title: "Error adding player", variant: "destructive" });
     } else {
-      setNewPlayer({ child_name: "", age: "", parent_name: "", phone: "", email: "", experience: "" });
+      setNewPlayer({ child_name: "", age: "", date_of_birth: undefined, parent_name: "", phone: "", email: "", experience: "" });
       setIsAddDialogOpen(false);
       toast({ title: "Player added successfully!" });
       fetchPlayers();
@@ -455,6 +470,7 @@ export default function AdminDashboard() {
     setNewPlayer({
       child_name: player.child_name,
       age: player.age,
+      date_of_birth: player.date_of_birth ? new Date(player.date_of_birth) : undefined,
       parent_name: player.parent_name,
       phone: player.phone,
       email: player.email,
@@ -464,16 +480,26 @@ export default function AdminDashboard() {
   };
 
   const handleUpdatePlayer = async () => {
-    if (!editingPlayer || !newPlayer.child_name || !newPlayer.age || !newPlayer.parent_name) {
-      toast({ title: "Please fill required fields", variant: "destructive" });
+    if (!editingPlayer || !newPlayer.child_name || !newPlayer.date_of_birth || !newPlayer.parent_name) {
+      toast({ title: "Please fill required fields (Name, DOB, Parent)", variant: "destructive" });
       return;
+    }
+
+    // Calculate age from date of birth
+    const today = new Date();
+    const birthDate = newPlayer.date_of_birth;
+    let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      calculatedAge--;
     }
     
     const { error } = await supabase
       .from('registrations')
       .update({
         child_name: newPlayer.child_name,
-        age: newPlayer.age,
+        date_of_birth: format(newPlayer.date_of_birth, 'yyyy-MM-dd'),
+        age: calculatedAge.toString(),
         parent_name: newPlayer.parent_name,
         phone: newPlayer.phone,
         email: newPlayer.email,
@@ -484,7 +510,7 @@ export default function AdminDashboard() {
     if (error) {
       toast({ title: "Error updating player", variant: "destructive" });
     } else {
-      setNewPlayer({ child_name: "", age: "", parent_name: "", phone: "", email: "", experience: "" });
+      setNewPlayer({ child_name: "", age: "", date_of_birth: undefined, parent_name: "", phone: "", email: "", experience: "" });
       setEditingPlayer(null);
       setIsEditPlayerDialogOpen(false);
       toast({ title: "Player updated successfully!" });
@@ -923,20 +949,34 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Age *</Label>
-                          <Select
-                            value={newPlayer.age}
-                            onValueChange={(value) => setNewPlayer({ ...newPlayer, age: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select age" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map((age) => (
-                                <SelectItem key={age} value={age.toString()}>{age} years</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Label>Date of Birth *</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal",
+                                  !newPlayer.date_of_birth && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {newPlayer.date_of_birth ? format(newPlayer.date_of_birth, "PPP") : <span>Select date of birth</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <CalendarComponent
+                                mode="single"
+                                selected={newPlayer.date_of_birth}
+                                onSelect={(date) => setNewPlayer({ ...newPlayer, date_of_birth: date })}
+                                disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                                initialFocus
+                                className={cn("p-3 pointer-events-auto")}
+                                captionLayout="dropdown-buttons"
+                                fromYear={2005}
+                                toYear={new Date().getFullYear()}
+                              />
+                            </PopoverContent>
+                          </Popover>
                         </div>
                         <div className="space-y-2">
                           <Label>Parent Name *</Label>
@@ -982,6 +1022,7 @@ export default function AdminDashboard() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Name</TableHead>
+                        <TableHead>DOB</TableHead>
                         <TableHead>Age</TableHead>
                         <TableHead>Parent</TableHead>
                         <TableHead>Contact</TableHead>
@@ -994,6 +1035,7 @@ export default function AdminDashboard() {
                       {filteredPlayers.map((player) => (
                         <TableRow key={player.id}>
                           <TableCell className="font-medium">{player.child_name}</TableCell>
+                          <TableCell>{player.date_of_birth ? format(new Date(player.date_of_birth), 'MMM d, yyyy') : '-'}</TableCell>
                           <TableCell>{player.age}</TableCell>
                           <TableCell>{player.parent_name}</TableCell>
                           <TableCell>
@@ -1880,7 +1922,7 @@ export default function AdminDashboard() {
           setIsEditPlayerDialogOpen(open);
           if (!open) {
             setEditingPlayer(null);
-            setNewPlayer({ child_name: "", age: "", parent_name: "", phone: "", email: "", experience: "" });
+            setNewPlayer({ child_name: "", age: "", date_of_birth: undefined, parent_name: "", phone: "", email: "", experience: "" });
           }
         }}>
           <DialogContent>
@@ -1897,20 +1939,34 @@ export default function AdminDashboard() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Age *</Label>
-                <Select
-                  value={newPlayer.age}
-                  onValueChange={(value) => setNewPlayer({ ...newPlayer, age: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select age" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map((age) => (
-                      <SelectItem key={age} value={age.toString()}>{age} years</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Date of Birth *</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !newPlayer.date_of_birth && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {newPlayer.date_of_birth ? format(newPlayer.date_of_birth, "PPP") : <span>Select date of birth</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={newPlayer.date_of_birth}
+                      onSelect={(date) => setNewPlayer({ ...newPlayer, date_of_birth: date })}
+                      disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                      captionLayout="dropdown-buttons"
+                      fromYear={2005}
+                      toYear={new Date().getFullYear()}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label>Parent Name *</Label>
