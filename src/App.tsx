@@ -11,6 +11,8 @@ import Sponsors from "./pages/Sponsors";
 import AdminLogin from "./pages/AdminLogin";
 import AdminResetPassword from "./pages/AdminResetPassword";
 import AdminDashboard from "./pages/AdminDashboard";
+import ParentAuth from "./pages/ParentAuth";
+import ParentDashboard from "./pages/ParentDashboard";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -29,6 +31,8 @@ const App = () => (
           <Route path="/admin" element={<AdminLogin />} />
           <Route path="/admin/reset-password" element={<AdminResetPassword />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/parent" element={<ParentAuth />} />
+          <Route path="/parent/dashboard" element={<ParentDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

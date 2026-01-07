@@ -46,9 +46,14 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            <Link to="/admin" className="ml-2">
+            <Link to="/parent" className="ml-2">
               <Button variant="outline" size="sm">
-                Admin Login
+                Parent Login
+              </Button>
+            </Link>
+            <Link to="/admin" className="ml-2">
+              <Button variant="ghost" size="sm">
+                Admin
               </Button>
             </Link>
           </div>
@@ -82,9 +87,14 @@ export function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              <Link to="/admin" onClick={() => setIsOpen(false)}>
+              <Link to="/parent" onClick={() => setIsOpen(false)}>
                 <Button variant="outline" className="w-full mt-2">
-                  Admin Login
+                  Parent Login
+                </Button>
+              </Link>
+              <Link to="/admin" onClick={() => setIsOpen(false)}>
+                <Button variant="ghost" className="w-full mt-2">
+                  Admin
                 </Button>
               </Link>
             </div>
