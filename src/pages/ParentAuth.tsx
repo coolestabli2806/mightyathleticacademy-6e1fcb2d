@@ -58,12 +58,13 @@ export default function ParentAuth() {
 
     setLoading(true);
 
-    // First check if this email exists in registrations
-    const { data: registrations, error: checkError } = await supabase
-      .from('registrations')
-      .select('id')
-      .ilike('email', email.toLowerCase().trim())
-      .limit(1);
+    // First check if this email exists in registrations (server-side lookup)
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const { data: checkData, error: checkError } = await supabase.functions.invoke(
+      "check-registration-email",
+      { body: { email: normalizedEmail } }
+    );
 
     if (checkError) {
       toast({ title: "Error checking registration", variant: "destructive" });
@@ -71,7 +72,7 @@ export default function ParentAuth() {
       return;
     }
 
-    if (!registrations || registrations.length === 0) {
+    if (!checkData?.exists) {
       toast({ 
         title: "Email not found", 
         description: "Please use the same email you provided when registering your child with the coach.",
@@ -82,7 +83,7 @@ export default function ParentAuth() {
     }
 
     const { error } = await supabase.auth.signUp({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/parent/dashboard`
