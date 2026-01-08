@@ -62,7 +62,7 @@ export default function ParentAuth() {
     const { data: registrations, error: checkError } = await supabase
       .from('registrations')
       .select('id')
-      .eq('email', email.toLowerCase().trim())
+      .ilike('email', email.toLowerCase().trim())
       .limit(1);
 
     if (checkError) {
