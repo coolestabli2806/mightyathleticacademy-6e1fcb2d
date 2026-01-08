@@ -128,6 +128,85 @@ export default function ParentAuth() {
     setLoading(false);
   };
 
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      resetEmail.toLowerCase().trim(),
+      { redirectTo: `${window.location.origin}/parent/reset-password` }
+    );
+
+    if (error) {
+      toast({ title: error.message, variant: "destructive" });
+    } else {
+      toast({ 
+        title: "Reset link sent!", 
+        description: "Check your email for the password reset link." 
+      });
+      setShowForgotPassword(false);
+      setResetEmail("");
+    }
+
+    setResetLoading(false);
+  };
+
+  if (showForgotPassword) {
+    return (
+      <Layout>
+        <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-12 h-12 rounded-xl bg-gradient-hero flex items-center justify-center mb-4">
+                <Mail className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <CardTitle className="font-heading text-2xl">
+                Reset Password
+              </CardTitle>
+              <CardDescription>
+                Enter your email and we'll send you a reset link
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleForgotPassword} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="resetEmail">Email</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="resetEmail"
+                      type="email"
+                      placeholder="parent@example.com"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full" disabled={resetLoading}>
+                  {resetLoading ? "Sending..." : "Send Reset Link"}
+                </Button>
+              </form>
+
+              <div className="mt-4 text-center">
+                <Button variant="ghost" size="sm" onClick={() => setShowForgotPassword(false)}>
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Sign In
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="min-h-[80vh] flex items-center justify-center py-12 px-4">
@@ -205,6 +284,18 @@ export default function ParentAuth() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Please wait..." : (isSignUp ? "Create Account" : "Sign In")}
               </Button>
+
+              {!isSignUp && (
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-sm text-muted-foreground hover:text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+              )}
             </form>
 
             <div className="mt-6 text-center">
