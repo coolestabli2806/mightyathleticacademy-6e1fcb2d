@@ -19,16 +19,35 @@ export default function AdminLogin() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
-        navigate("/admin/dashboard");
-      }
-    });
+  const [isInitializing, setIsInitializing] = useState(true);
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+  useEffect(() => {
+    const ADMIN_EMAIL = "mightyathleticacademy@gmail.com";
+
+    const initializeAuth = async () => {
+      // Sign out any existing session when accessing admin login
+      const { data: { session } } = await supabase.auth.getSession();
+      
       if (session) {
-        navigate("/admin/dashboard");
+        // Check if the current user is already the admin
+        if (session.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+          navigate("/admin/dashboard");
+          return;
+        }
+        // If logged in as a non-admin (parent), sign them out
+        await supabase.auth.signOut();
+      }
+      setIsInitializing(false);
+    };
+
+    initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Only redirect if it's the admin email
+        if (session.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+          navigate("/admin/dashboard");
+        }
       }
     });
 
@@ -60,12 +79,22 @@ export default function AdminLogin() {
     setIsLoading(false);
   };
 
-  const ADMIN_EMAIL = "mightyathleticacademy@gmail.com";
+  const ADMIN_EMAIL_CHECK = "mightyathleticacademy@gmail.com";
+
+  if (isInitializing) {
+    return (
+      <Layout showFooter={false}>
+        <section className="min-h-[calc(100vh-4rem)] flex items-center justify-center bg-secondary">
+          <div className="text-muted-foreground">Loading...</div>
+        </section>
+      </Layout>
+    );
+  }
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (resetEmail.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    if (resetEmail.toLowerCase() !== ADMIN_EMAIL_CHECK.toLowerCase()) {
       toast({
         title: "Incorrect Email ID",
         description: "The email entered is not a valid admin email.",
