@@ -8,13 +8,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Users, Calendar, DollarSign, User, Mail, Phone } from "lucide-react";
+import { LogOut, Users, Calendar, DollarSign, User, Mail, Phone, FileText } from "lucide-react";
 import { format } from "date-fns";
+import { WaiverForm } from "@/components/waiver/WaiverForm";
 
 interface Registration {
   id: string;
   child_name: string;
   age: string;
+  date_of_birth: string;
   parent_name: string;
   email: string;
   phone: string;
@@ -39,9 +41,19 @@ interface PaymentBlock {
   status: 'complete' | 'in_progress' | 'not_started';
 }
 
+interface Waiver {
+  id: string;
+  registration_id: string;
+  parent_signature: string;
+  parent_signed_date: string;
+  player_signature: string | null;
+  player_signed_date: string | null;
+}
+
 export default function ParentDashboard() {
   const [children, setChildren] = useState<Registration[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [waivers, setWaivers] = useState<Waiver[]>([]);
   const [loading, setLoading] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const { toast } = useToast();
@@ -82,7 +94,7 @@ export default function ParentDashboard() {
     const { data: childrenData, error: childrenError } = await supabase
       .from('registrations')
       .select('*')
-      .eq('email', userEmail.toLowerCase());
+      .ilike('email', userEmail);
 
     if (childrenError) {
       toast({ title: "Error loading data", variant: "destructive" });
@@ -92,19 +104,31 @@ export default function ParentDashboard() {
 
     setChildren(childrenData || []);
 
-    // Fetch attendance records for all children
+    // Fetch attendance records and waivers for all children
     if (childrenData && childrenData.length > 0) {
       const childIds = childrenData.map(c => c.id);
-      const { data: attendanceData } = await supabase
-        .from('attendance_records')
-        .select('*')
-        .in('registration_id', childIds)
-        .order('session_date', { ascending: false });
+      
+      const [attendanceResult, waiversResult] = await Promise.all([
+        supabase
+          .from('attendance_records')
+          .select('*')
+          .in('registration_id', childIds)
+          .order('session_date', { ascending: false }),
+        supabase
+          .from('waivers')
+          .select('*')
+          .in('registration_id', childIds)
+      ]);
 
-      setAttendanceRecords(attendanceData || []);
+      setAttendanceRecords(attendanceResult.data || []);
+      setWaivers(waiversResult.data || []);
     }
 
     setLoading(false);
+  };
+
+  const getWaiverForChild = (childId: string) => {
+    return waivers.find(w => w.registration_id === childId) || null;
   };
 
   const handleLogout = async () => {
@@ -182,10 +206,14 @@ export default function ParentDashboard() {
           </Card>
         ) : (
           <Tabs defaultValue="children" className="space-y-6">
-            <TabsList>
+            <TabsList className="flex-wrap h-auto">
               <TabsTrigger value="children" className="gap-2">
                 <Users className="w-4 h-4" />
                 My Children
+              </TabsTrigger>
+              <TabsTrigger value="waivers" className="gap-2">
+                <FileText className="w-4 h-4" />
+                Waivers
               </TabsTrigger>
               <TabsTrigger value="attendance" className="gap-2">
                 <Calendar className="w-4 h-4" />
@@ -239,6 +267,18 @@ export default function ParentDashboard() {
                   </Card>
                 ))}
               </div>
+            </TabsContent>
+
+            {/* Waivers Tab */}
+            <TabsContent value="waivers" className="space-y-4">
+              {children.map((child) => (
+                <WaiverForm
+                  key={child.id}
+                  registration={child}
+                  existingWaiver={getWaiverForChild(child.id)}
+                  onWaiverSigned={fetchData}
+                />
+              ))}
             </TabsContent>
 
             {/* Attendance Tab */}
