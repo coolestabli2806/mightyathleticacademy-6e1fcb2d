@@ -213,6 +213,74 @@ export type Database = {
         }
         Relationships: []
       }
+      waivers: {
+        Row: {
+          concussion_awareness: boolean
+          created_at: string
+          emergency_medical: boolean
+          health_participation: boolean
+          id: string
+          media_consent: boolean
+          parent_email: string
+          parent_guardian_name: string
+          parent_signature: string
+          parent_signed_date: string
+          phone_email: string
+          player_dob: string
+          player_name: string
+          player_signature: string | null
+          player_signed_date: string | null
+          registration_id: string
+          updated_at: string
+        }
+        Insert: {
+          concussion_awareness?: boolean
+          created_at?: string
+          emergency_medical?: boolean
+          health_participation?: boolean
+          id?: string
+          media_consent?: boolean
+          parent_email: string
+          parent_guardian_name: string
+          parent_signature: string
+          parent_signed_date: string
+          phone_email: string
+          player_dob: string
+          player_name: string
+          player_signature?: string | null
+          player_signed_date?: string | null
+          registration_id: string
+          updated_at?: string
+        }
+        Update: {
+          concussion_awareness?: boolean
+          created_at?: string
+          emergency_medical?: boolean
+          health_participation?: boolean
+          id?: string
+          media_consent?: boolean
+          parent_email?: string
+          parent_guardian_name?: string
+          parent_signature?: string
+          parent_signed_date?: string
+          phone_email?: string
+          player_dob?: string
+          player_name?: string
+          player_signature?: string | null
+          player_signed_date?: string | null
+          registration_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waivers_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

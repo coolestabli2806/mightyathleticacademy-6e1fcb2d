@@ -6,7 +6,7 @@ import {
   Users, Calendar, DollarSign, CheckCircle, 
   LogOut, Plus, Search, MoreVertical, 
   UserCheck, Clock, AlertCircle, RefreshCw, Trash2, Edit, MapPin,
-  Camera, Heart, History, Send, CalendarIcon
+  Camera, Heart, History, Send, CalendarIcon, FileText, Eye
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,6 +85,25 @@ interface Sponsor {
   is_active: boolean;
 }
 
+interface Waiver {
+  id: string;
+  registration_id: string;
+  parent_email: string;
+  player_name: string;
+  player_dob: string;
+  parent_guardian_name: string;
+  phone_email: string;
+  health_participation: boolean;
+  emergency_medical: boolean;
+  concussion_awareness: boolean;
+  media_consent: boolean;
+  parent_signature: string;
+  parent_signed_date: string;
+  player_signature: string | null;
+  player_signed_date: string | null;
+  created_at: string;
+}
+
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const TIMES = ['8:00 AM', '9:00 AM', '10:00 AM', '10:30 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '4:30 PM', '5:00 PM', '5:30 PM', '6:00 PM'];
 const AGE_GROUPS = ['5-8', '9-12', '13-16', 'All Ages'];
@@ -131,6 +150,9 @@ export default function AdminDashboard() {
   const [editingAttendance, setEditingAttendance] = useState<AttendanceRecord | null>(null);
   const [isEditAttendanceDialogOpen, setIsEditAttendanceDialogOpen] = useState(false);
   const [editAttendanceDate, setEditAttendanceDate] = useState("");
+  const [waivers, setWaivers] = useState<Waiver[]>([]);
+  const [selectedWaiver, setSelectedWaiver] = useState<Waiver | null>(null);
+  const [isWaiverDialogOpen, setIsWaiverDialogOpen] = useState(false);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -157,6 +179,7 @@ export default function AdminDashboard() {
         fetchAttendanceRecords();
         fetchGalleryItems();
         fetchSponsors();
+        fetchWaivers();
       }
     });
 
@@ -241,6 +264,19 @@ export default function AdminDashboard() {
       console.error('Error fetching sponsors:', error);
     } else {
       setSponsors(data || []);
+    }
+  };
+
+  const fetchWaivers = async () => {
+    const { data, error } = await supabase
+      .from('waivers')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching waivers:', error);
+    } else {
+      setWaivers(data || []);
     }
   };
 
@@ -910,6 +946,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="sponsors" className="gap-2">
               <Heart className="w-4 h-4" />
               Sponsors
+            </TabsTrigger>
+            <TabsTrigger value="waivers" className="gap-2">
+              <FileText className="w-4 h-4" />
+              Waivers
             </TabsTrigger>
           </TabsList>
 
@@ -1851,6 +1891,64 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Waivers Tab */}
+          <TabsContent value="waivers">
+            <Card className="border-none shadow-card">
+              <CardHeader>
+                <CardTitle>Signed Waivers</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {waivers.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No signed waivers yet. Parents can sign waivers from their dashboard.
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Player Name</TableHead>
+                        <TableHead>Parent/Guardian</TableHead>
+                        <TableHead>Date Signed</TableHead>
+                        <TableHead>Consents</TableHead>
+                        <TableHead></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {waivers.map((waiver) => (
+                        <TableRow key={waiver.id}>
+                          <TableCell className="font-medium">{waiver.player_name}</TableCell>
+                          <TableCell>{waiver.parent_guardian_name}</TableCell>
+                          <TableCell>{format(new Date(waiver.parent_signed_date), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>
+                            <div className="flex gap-1 flex-wrap">
+                              {waiver.health_participation && <Badge variant="outline" className="text-xs">Health</Badge>}
+                              {waiver.emergency_medical && <Badge variant="outline" className="text-xs">Emergency</Badge>}
+                              {waiver.concussion_awareness && <Badge variant="outline" className="text-xs">Concussion</Badge>}
+                              {waiver.media_consent && <Badge variant="secondary" className="text-xs">Media</Badge>}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedWaiver(waiver);
+                                setIsWaiverDialogOpen(true);
+                              }}
+                            >
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
 
         {/* Attendance Dialog */}
@@ -2026,6 +2124,98 @@ export default function AdminDashboard() {
                 Update Attendance
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* View Waiver Dialog */}
+        <Dialog open={isWaiverDialogOpen} onOpenChange={setIsWaiverDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Waiver Details - {selectedWaiver?.player_name}</DialogTitle>
+            </DialogHeader>
+            {selectedWaiver && (
+              <div className="mt-4 space-y-6">
+                {/* Player Info */}
+                <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Player Name:</span>
+                    <p className="font-medium">{selectedWaiver.player_name}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Date of Birth:</span>
+                    <p className="font-medium">{selectedWaiver.player_dob}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Parent/Guardian:</span>
+                    <p className="font-medium">{selectedWaiver.parent_guardian_name}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Contact:</span>
+                    <p className="font-medium text-xs">{selectedWaiver.phone_email}</p>
+                  </div>
+                </div>
+
+                {/* Acknowledgments */}
+                <div className="space-y-3">
+                  <h4 className="font-medium">Acknowledgments</h4>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={selectedWaiver.health_participation ? "default" : "secondary"}>
+                        {selectedWaiver.health_participation ? "✓" : "✗"}
+                      </Badge>
+                      Health & Participation
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={selectedWaiver.emergency_medical ? "default" : "secondary"}>
+                        {selectedWaiver.emergency_medical ? "✓" : "✗"}
+                      </Badge>
+                      Emergency Medical
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={selectedWaiver.concussion_awareness ? "default" : "secondary"}>
+                        {selectedWaiver.concussion_awareness ? "✓" : "✗"}
+                      </Badge>
+                      Concussion Awareness
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={selectedWaiver.media_consent ? "default" : "secondary"}>
+                        {selectedWaiver.media_consent ? "✓" : "✗"}
+                      </Badge>
+                      Media Consent
+                    </div>
+                  </div>
+                </div>
+
+                {/* Signatures */}
+                <div className="space-y-3 border-t pt-4">
+                  <h4 className="font-medium">Signatures</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 border rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Parent/Guardian Signature</p>
+                      <p className="font-medium italic text-lg">{selectedWaiver.parent_signature}</p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Signed: {format(new Date(selectedWaiver.parent_signed_date), 'MMMM d, yyyy')}
+                      </p>
+                    </div>
+                    {selectedWaiver.player_signature && (
+                      <div className="p-4 border rounded-lg">
+                        <p className="text-xs text-muted-foreground mb-1">Player Signature</p>
+                        <p className="font-medium italic text-lg">{selectedWaiver.player_signature}</p>
+                        {selectedWaiver.player_signed_date && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Signed: {format(new Date(selectedWaiver.player_signed_date), 'MMMM d, yyyy')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="text-xs text-muted-foreground text-center pt-2">
+                  Waiver submitted on {format(new Date(selectedWaiver.created_at), 'MMMM d, yyyy \'at\' h:mm a')}
+                </div>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </main>
