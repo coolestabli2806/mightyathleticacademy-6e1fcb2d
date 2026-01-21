@@ -25,6 +25,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from "@supabase/supabase-js";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { formatDateOnly, parseDateOnly } from "@/lib/dateOnly";
 
 interface Registration {
   id: string;
@@ -325,7 +326,7 @@ export default function AdminDashboard() {
     
     const { error } = await supabase.from('registrations').insert({
       child_name: newPlayer.child_name,
-      date_of_birth: format(newPlayer.date_of_birth, 'yyyy-MM-dd'),
+      date_of_birth: formatDateOnly(newPlayer.date_of_birth),
       age: calculatedAge.toString(),
       parent_name: newPlayer.parent_name,
       phone: newPlayer.phone,
@@ -523,7 +524,7 @@ export default function AdminDashboard() {
     setNewPlayer({
       child_name: player.child_name,
       age: player.age,
-      date_of_birth: player.date_of_birth ? new Date(player.date_of_birth) : undefined,
+      date_of_birth: parseDateOnly(player.date_of_birth),
       parent_name: player.parent_name,
       phone: player.phone,
       email: player.email,
@@ -551,7 +552,7 @@ export default function AdminDashboard() {
       .from('registrations')
       .update({
         child_name: newPlayer.child_name,
-        date_of_birth: format(newPlayer.date_of_birth, 'yyyy-MM-dd'),
+        date_of_birth: formatDateOnly(newPlayer.date_of_birth),
         age: calculatedAge.toString(),
         parent_name: newPlayer.parent_name,
         phone: newPlayer.phone,
@@ -1092,7 +1093,9 @@ export default function AdminDashboard() {
                       {filteredPlayers.map((player) => (
                         <TableRow key={player.id}>
                           <TableCell className="font-medium">{player.child_name}</TableCell>
-                          <TableCell>{player.date_of_birth ? format(new Date(player.date_of_birth), 'MMM d, yyyy') : '-'}</TableCell>
+                          <TableCell>
+                            {player.date_of_birth ? format(parseDateOnly(player.date_of_birth)!, 'MMM d, yyyy') : '-'}
+                          </TableCell>
                           <TableCell>{player.age}</TableCell>
                           <TableCell>{player.parent_name}</TableCell>
                           <TableCell>
