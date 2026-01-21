@@ -113,12 +113,26 @@ export default function ParentAuth() {
     setLoading(false);
   };
 
+  const ADMIN_EMAIL = "mightyathleticacademy@gmail.com";
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = email.toLowerCase().trim();
+    
+    // Prevent admin from logging in through parent portal
+    if (normalizedEmail === ADMIN_EMAIL.toLowerCase()) {
+      toast({ 
+        title: "Access Denied", 
+        description: "Admin accounts cannot access the Parent Portal. Please use the Admin Login.",
+        variant: "destructive" 
+      });
+      return;
+    }
+
     setLoading(true);
 
     const { error } = await supabase.auth.signInWithPassword({
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       password,
     });
 
