@@ -142,7 +142,7 @@ export default function AdminDashboard() {
   const [isLocationDialogOpen, setIsLocationDialogOpen] = useState(false);
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<Registration | null>(null);
-  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceDate, setAttendanceDate] = useState(formatDateOnly(new Date()));
   const [editingSchedule, setEditingSchedule] = useState<Schedule | null>(null);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
@@ -354,7 +354,7 @@ export default function AdminDashboard() {
 
   const openAttendanceDialog = (player: Registration) => {
     setSelectedPlayer(player);
-    setAttendanceDate(new Date().toISOString().split('T')[0]);
+    setAttendanceDate(formatDateOnly(new Date()));
     setIsAttendanceDialogOpen(true);
   };
 
@@ -653,6 +653,19 @@ export default function AdminDashboard() {
     }
     
     return blocks.slice(-8); // Return last 8 blocks
+  };
+
+  // Get current block of attendance (up to 8 records)
+  const getCurrentAttendanceBlock = (playerId: string) => {
+    const playerAttendance = attendanceRecords
+      .filter(r => r.registration_id === playerId)
+      .sort((a, b) => new Date(a.session_date).getTime() - new Date(b.session_date).getTime());
+    
+    if (playerAttendance.length === 0) return [];
+    
+    // Calculate which block the player is currently in
+    const currentBlockStart = Math.floor(playerAttendance.length / 8) * 8;
+    return playerAttendance.slice(currentBlockStart, currentBlockStart + 8);
   };
 
   const openEditSchedule = (schedule: Schedule) => {
@@ -1118,11 +1131,11 @@ export default function AdminDashboard() {
                                 {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
                                   <div
                                     key={s}
-                                    className={`w-2 h-2 rounded-full ${s <= player.sessions_attended ? 'bg-primary' : 'bg-border'}`}
+                                    className={`w-2 h-2 rounded-full ${s <= getCurrentAttendanceBlock(player.id).length ? 'bg-primary' : 'bg-border'}`}
                                   />
                                 ))}
                               </div>
-                              <span className="text-sm text-muted-foreground">{player.sessions_attended}/8</span>
+                              <span className="text-sm text-muted-foreground">{getCurrentAttendanceBlock(player.id).length}/8</span>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1194,7 +1207,7 @@ export default function AdminDashboard() {
                                 {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
                                   <div
                                     key={s}
-                                    className={`w-3 h-3 rounded-full ${s <= player.sessions_attended ? 'bg-primary' : 'bg-border'}`}
+                                    className={`w-3 h-3 rounded-full ${s <= getCurrentAttendanceBlock(player.id).length ? 'bg-primary' : 'bg-border'}`}
                                   />
                                 ))}
                               </div>
@@ -1217,12 +1230,12 @@ export default function AdminDashboard() {
                           {/* Attendance History with Edit/Delete */}
                           {getPlayerAttendance(player.id).length > 0 && (
                             <div className="mt-3 pt-3 border-t">
-                              <p className="text-xs text-muted-foreground mb-2">Recent attendance:</p>
+                              <p className="text-xs text-muted-foreground mb-2">Current block attendance ({getCurrentAttendanceBlock(player.id).length}/8):</p>
                               <div className="flex flex-wrap gap-1">
-                                {getPlayerAttendance(player.id).slice(0, 5).map((record) => (
+                                {getCurrentAttendanceBlock(player.id).map((record) => (
                                   <div key={record.id} className="flex items-center gap-1">
                                     <Badge variant="outline" className="text-xs pr-1">
-                                      {new Date(record.session_date).toLocaleDateString()}
+                                      {format(parseDateOnly(record.session_date)!, 'MMM d, yyyy')}
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
                                           <Button variant="ghost" size="icon" className="h-4 w-4 ml-1">
@@ -1349,8 +1362,8 @@ export default function AdminDashboard() {
                                     {blockHistory.map((block) => (
                                       <TableRow key={block.blockNumber}>
                                         <TableCell className="text-xs">{block.blockNumber}</TableCell>
-                                        <TableCell className="text-xs">{new Date(block.startDate).toLocaleDateString()}</TableCell>
-                                        <TableCell className="text-xs">{new Date(block.endDate).toLocaleDateString()}</TableCell>
+                                        <TableCell className="text-xs">{format(parseDateOnly(block.startDate)!, 'MMM d, yyyy')}</TableCell>
+                                        <TableCell className="text-xs">{format(parseDateOnly(block.endDate)!, 'MMM d, yyyy')}</TableCell>
                                         <TableCell className="text-xs">{block.sessions}/8</TableCell>
                                         <TableCell>
                                           <Badge variant={block.sessions === 8 ? "success" : "outline"} className="text-xs">
@@ -1900,7 +1913,7 @@ export default function AdminDashboard() {
                               <div className="flex flex-wrap gap-2">
                                 {playerAttendance.slice(0, 10).map((record) => (
                                   <Badge key={record.id} variant="outline" className="text-xs">
-                                    {new Date(record.session_date).toLocaleDateString()}
+                                    {format(parseDateOnly(record.session_date)!, 'MMM d, yyyy')}
                                   </Badge>
                                 ))}
                                 {playerAttendance.length > 10 && (
@@ -2030,7 +2043,7 @@ export default function AdminDashboard() {
                   <TableBody>
                     {selectedPlayerHistory && getPlayerAttendance(selectedPlayerHistory.id).map((record) => (
                       <TableRow key={record.id}>
-                        <TableCell>{new Date(record.session_date).toLocaleDateString()}</TableCell>
+                        <TableCell>{format(parseDateOnly(record.session_date)!, 'MMM d, yyyy')}</TableCell>
                         <TableCell className="text-muted-foreground text-sm">
                           {new Date(record.marked_at).toLocaleString()}
                         </TableCell>
@@ -2184,32 +2197,59 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Acknowledgments */}
-                <div className="space-y-3">
-                  <h4 className="font-medium">Acknowledgments</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={selectedWaiver.health_participation ? "default" : "secondary"}>
+                <div className="space-y-3 border-t pt-4">
+                  <h4 className="font-medium">Acknowledged Consents</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                      <Badge variant={selectedWaiver.health_participation ? "default" : "secondary"} className="mt-1">
                         {selectedWaiver.health_participation ? "✓" : "✗"}
                       </Badge>
-                      Health & Participation
+                      <div className="flex-1">
+                        <p className="font-medium">Health & Participation</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          I agree to bring my child to practices or games only if they are in good health. 
+                          I understand that participating while ill or injured could put my child and others at risk.
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={selectedWaiver.emergency_medical ? "default" : "secondary"}>
+
+                    <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                      <Badge variant={selectedWaiver.emergency_medical ? "default" : "secondary"} className="mt-1">
                         {selectedWaiver.emergency_medical ? "✓" : "✗"}
                       </Badge>
-                      Emergency Medical
+                      <div className="flex-1">
+                        <p className="font-medium">Emergency Medical Treatment</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          I authorize coaches or representatives to seek medical care, including transport 
+                          to a hospital, if necessary.
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={selectedWaiver.concussion_awareness ? "default" : "secondary"}>
+
+                    <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                      <Badge variant={selectedWaiver.concussion_awareness ? "default" : "secondary"} className="mt-1">
                         {selectedWaiver.concussion_awareness ? "✓" : "✗"}
                       </Badge>
-                      Concussion Awareness
+                      <div className="flex-1">
+                        <p className="font-medium">Concussion Awareness</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          I understand the risks of concussions and agree to notify coaches if my child shows 
+                          any symptoms. Medical clearance is required before returning to play.
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={selectedWaiver.media_consent ? "default" : "secondary"}>
+
+                    <div className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                      <Badge variant={selectedWaiver.media_consent ? "default" : "secondary"} className="mt-1">
                         {selectedWaiver.media_consent ? "✓" : "✗"}
                       </Badge>
-                      Media Consent
+                      <div className="flex-1">
+                        <p className="font-medium">Media Consent</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          I grant permission for the team/league to use photos, video, or media featuring 
+                          my child for promotional purposes.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { format } from "date-fns";
+import { formatDateOnly } from "@/lib/dateOnly";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,9 +78,9 @@ export function WaiverForm({ registration, existingWaiver, onWaiverSigned }: Wai
         concussion_awareness: concussionAwareness,
         media_consent: mediaConsent,
         parent_signature: parentSignature.trim(),
-        parent_signed_date: new Date().toISOString().split('T')[0],
+        parent_signed_date: formatDateOnly(new Date()),
         player_signature: playerSignature.trim() || null,
-        player_signed_date: playerSignature.trim() ? new Date().toISOString().split('T')[0] : null
+        player_signed_date: playerSignature.trim() ? formatDateOnly(new Date()) : null
       });
 
       if (error) throw error;
@@ -114,12 +115,76 @@ export function WaiverForm({ registration, existingWaiver, onWaiverSigned }: Wai
             Signed on {format(new Date(existingWaiver.parent_signed_date), "MMMM d, yyyy")}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2 text-sm">
-          <p><span className="text-muted-foreground">Player:</span> {registration.child_name}</p>
-          <p><span className="text-muted-foreground">Parent Signature:</span> {existingWaiver.parent_signature}</p>
-          {existingWaiver.player_signature && (
-            <p><span className="text-muted-foreground">Player Signature:</span> {existingWaiver.player_signature}</p>
-          )}
+        <CardContent className="space-y-4 text-sm">
+          <div className="space-y-2">
+            <p><span className="font-medium text-muted-foreground">Player:</span> {registration.child_name}</p>
+            <p><span className="font-medium text-muted-foreground">Date of Birth:</span> {registration.date_of_birth}</p>
+          </div>
+
+          <div className="border-t pt-4 space-y-3">
+            <p className="font-medium text-foreground">Acknowledged Consents:</p>
+            
+            <div className="flex items-start gap-3 p-3 bg-white rounded-lg">
+              <div className="w-4 h-4 mt-0.5 rounded border border-green-600 bg-green-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-green-700 text-xs">✓</span>
+              </div>
+              <div>
+                <p className="font-medium">Health & Participation</p>
+                <p className="text-muted-foreground">
+                  I agree to bring my child to practices or games only if they are in good health. 
+                  I understand that participating while ill or injured could put my child and others at risk.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 bg-white rounded-lg">
+              <div className="w-4 h-4 mt-0.5 rounded border border-green-600 bg-green-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-green-700 text-xs">✓</span>
+              </div>
+              <div>
+                <p className="font-medium">Emergency Medical Treatment</p>
+                <p className="text-muted-foreground">
+                  I authorize coaches or representatives to seek medical care, including transport 
+                  to a hospital, if necessary.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 bg-white rounded-lg">
+              <div className="w-4 h-4 mt-0.5 rounded border border-green-600 bg-green-100 flex items-center justify-center flex-shrink-0">
+                <span className="text-green-700 text-xs">✓</span>
+              </div>
+              <div>
+                <p className="font-medium">Concussion Awareness</p>
+                <p className="text-muted-foreground">
+                  I understand the risks of concussions and agree to notify coaches if my child shows 
+                  any symptoms. Medical clearance is required before returning to play.
+                </p>
+              </div>
+            </div>
+
+            {existingWaiver && (
+              <div className="flex items-start gap-3 p-3 bg-white rounded-lg">
+                <div className={`w-4 h-4 mt-0.5 rounded border ${existingWaiver.media_consent ? 'border-green-600 bg-green-100' : 'border-gray-300 bg-gray-100'} flex items-center justify-center flex-shrink-0`}>
+                  {existingWaiver.media_consent && <span className="text-green-700 text-xs">✓</span>}
+                </div>
+                <div>
+                  <p className="font-medium">Media Consent</p>
+                  <p className="text-muted-foreground">
+                    I grant permission for the team/league to use photos, video, or media featuring 
+                    my child for promotional purposes.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t pt-4 space-y-2">
+            <p><span className="font-medium text-muted-foreground">Parent Signature:</span> {existingWaiver.parent_signature}</p>
+            {existingWaiver.player_signature && (
+              <p><span className="font-medium text-muted-foreground">Player Signature:</span> {existingWaiver.player_signature}</p>
+            )}
+          </div>
         </CardContent>
       </Card>
     );

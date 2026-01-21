@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { LogOut, Users, Calendar, DollarSign, User, Mail, Phone, FileText } from "lucide-react";
 import { format } from "date-fns";
+import { parseDateOnly } from "@/lib/dateOnly";
 import { WaiverForm } from "@/components/waiver/WaiverForm";
 
 interface Registration {
@@ -310,10 +311,10 @@ export default function ParentDashboard() {
                               {childAttendance.slice(0, 10).map((record) => (
                                 <TableRow key={record.id}>
                                   <TableCell>
-                                    {format(new Date(record.session_date), 'MMM d, yyyy')}
+                                    {format(parseDateOnly(record.session_date)!, 'MMM d, yyyy')}
                                   </TableCell>
                                   <TableCell>
-                                    {format(new Date(record.session_date), 'EEEE')}
+                                    {format(parseDateOnly(record.session_date)!, 'EEEE')}
                                   </TableCell>
                                   <TableCell className="text-muted-foreground">
                                     {record.notes || '-'}
@@ -381,8 +382,8 @@ export default function ParentDashboard() {
                                 <TableRow key={block.blockNumber}>
                                   <TableCell>Block {block.blockNumber}</TableCell>
                                   <TableCell>
-                                    {block.startDate && format(new Date(block.startDate), 'MMM d')} - {' '}
-                                    {block.endDate && format(new Date(block.endDate), 'MMM d, yyyy')}
+                                    {block.startDate && format(parseDateOnly(block.startDate)!, 'MMM d')} - {' '}
+                                    {block.endDate && format(parseDateOnly(block.endDate)!, 'MMM d, yyyy')}
                                   </TableCell>
                                   <TableCell>{block.sessionsInBlock} / 8</TableCell>
                                   <TableCell>
