@@ -215,7 +215,15 @@ export default function AdminDashboard() {
       console.error('Error fetching players:', error);
       toast({ title: "Error loading players", variant: "destructive" });
     } else {
-      setPlayers(data || []);
+      // Sort players alphabetically by last name before setting state
+      setPlayers((data || []).slice().sort((a, b) => {
+        const aLast = (a.child_name || "").trim().split(/\s+/).slice(-1)[0].toLowerCase();
+        const bLast = (b.child_name || "").trim().split(/\s+/).slice(-1)[0].toLowerCase();
+        if (aLast < bLast) return -1;
+        if (aLast > bLast) return 1;
+        // fallback to full name compare
+        return (a.child_name || "").localeCompare(b.child_name || "");
+      }));
     }
     setLoading(false);
   };

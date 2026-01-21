@@ -34,10 +34,10 @@ export function WaiverForm({ registration, existingWaiver, onWaiverSigned }: Wai
   const { toast } = useToast();
   const [submitting, setSubmitting] = useState(false);
   
-  const [healthParticipation, setHealthParticipation] = useState(false);
-  const [emergencyMedical, setEmergencyMedical] = useState(false);
-  const [concussionAwareness, setConcussionAwareness] = useState(false);
-  const [mediaConsent, setMediaConsent] = useState(false);
+  const [healthParticipation, setHealthParticipation] = useState(true);
+  const [emergencyMedical, setEmergencyMedical] = useState(true);
+  const [concussionAwareness, setConcussionAwareness] = useState(true);
+  const [mediaConsent, setMediaConsent] = useState(true);
   const [parentSignature, setParentSignature] = useState("");
   const [playerSignature, setPlayerSignature] = useState("");
 
@@ -179,6 +179,7 @@ export function WaiverForm({ registration, existingWaiver, onWaiverSigned }: Wai
             <Checkbox 
               id="health" 
               checked={healthParticipation}
+              disabled
               onCheckedChange={(checked) => setHealthParticipation(checked === true)}
             />
             <div className="space-y-1">
@@ -196,6 +197,7 @@ export function WaiverForm({ registration, existingWaiver, onWaiverSigned }: Wai
             <Checkbox 
               id="emergency" 
               checked={emergencyMedical}
+              disabled
               onCheckedChange={(checked) => setEmergencyMedical(checked === true)}
             />
             <div className="space-y-1">
@@ -213,6 +215,7 @@ export function WaiverForm({ registration, existingWaiver, onWaiverSigned }: Wai
             <Checkbox 
               id="concussion" 
               checked={concussionAwareness}
+              disabled
               onCheckedChange={(checked) => setConcussionAwareness(checked === true)}
             />
             <div className="space-y-1">
@@ -230,6 +233,7 @@ export function WaiverForm({ registration, existingWaiver, onWaiverSigned }: Wai
             <Checkbox 
               id="media" 
               checked={mediaConsent}
+              disabled
               onCheckedChange={(checked) => setMediaConsent(checked === true)}
             />
             <div className="space-y-1">
