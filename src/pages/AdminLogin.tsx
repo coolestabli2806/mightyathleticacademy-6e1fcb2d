@@ -56,10 +56,22 @@ export default function AdminLogin() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizedEmail = credentials.email.toLowerCase().trim();
+    
+    // Only allow admin email to log in
+    if (normalizedEmail !== ADMIN_EMAIL_CHECK.toLowerCase()) {
+      toast({
+        title: "Access Denied",
+        description: "Only admin accounts can access this portal. Please use the Parent Login.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     const { error } = await supabase.auth.signInWithPassword({
-      email: credentials.email,
+      email: normalizedEmail,
       password: credentials.password,
     });
 
