@@ -52,9 +52,15 @@ export default function Register() {
     setIsLoading(true);
 
     try {
+      // Format date using local date parts to avoid timezone issues
+      const year = formData.dateOfBirth.getFullYear();
+      const month = String(formData.dateOfBirth.getMonth() + 1).padStart(2, '0');
+      const day = String(formData.dateOfBirth.getDate()).padStart(2, '0');
+      const dateOfBirthString = `${year}-${month}-${day}`;
+
       const { error } = await supabase.from('registrations').insert({
         child_name: formData.childName,
-        date_of_birth: format(formData.dateOfBirth, 'yyyy-MM-dd'),
+        date_of_birth: dateOfBirthString,
         age: age.toString(),
         parent_name: formData.parentName,
         email: formData.email,
