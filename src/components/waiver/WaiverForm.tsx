@@ -27,6 +27,7 @@ interface WaiverFormProps {
     parent_signed_date: string;
     player_signature?: string;
     player_signed_date?: string;
+    media_consent?: boolean;
   } | null;
   onWaiverSigned: () => void;
 }
