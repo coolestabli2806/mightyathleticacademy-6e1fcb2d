@@ -1396,12 +1396,9 @@ export default function AdminDashboard() {
                 <CardTitle>Weekly Schedule</CardTitle>
                 <div className="flex items-center gap-2">
                   <Badge variant="outline">{schedules.length} sessions</Badge>
-                  <Button 
+                  <Button
                     variant="outline"
-                    onClick={() => {
-                      const emails = players.map(p => p.email).filter(Boolean).join(',');
-                      const subject = encodeURIComponent('Schedule for the Week');
-                      
+                    onClick={async () => {
                       // Group schedules by day
                       const schedulesByDay = DAYS.reduce((acc, day) => {
                         const daySessions = schedules.filter(s => s.day === day);
@@ -1411,27 +1408,57 @@ export default function AdminDashboard() {
                         return acc;
                       }, {} as Record<string, Schedule[]>);
                       
-                      // Format schedule details
-                      let bodyText = 'Dear Parents,\n\nHere is the training schedule for the week:\n\n';
+                      // Format schedule details as HTML
+                      let htmlContent = `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                          <h2 style="color: #1a365d;">Schedule for the Week</h2>
+                          <p>Dear Parents,</p>
+                          <p>Here is the training schedule for the week:</p>
+                      `;
                       
                       Object.entries(schedulesByDay).forEach(([day, sessions]) => {
-                        bodyText += `${day}:\n`;
+                        htmlContent += `<h3 style="color: #2d3748; margin-top: 20px;">${day}</h3><ul style="list-style: none; padding: 0;">`;
                         sessions.forEach(session => {
                           const locationName = session.locations?.name || 'TBD';
-                          bodyText += `  • ${session.time} - ${session.session_type} (Ages ${session.age_group}) at ${locationName}\n`;
+                          htmlContent += `<li style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+                            <strong>${session.time}</strong> - ${session.session_type} (Ages ${session.age_group}) at ${locationName}
+                          </li>`;
                         });
-                        bodyText += '\n';
+                        htmlContent += '</ul>';
                       });
                       
                       if (Object.keys(schedulesByDay).length === 0) {
-                        bodyText += 'No sessions scheduled for this week.\n\n';
+                        htmlContent += '<p>No sessions scheduled for this week.</p>';
                       }
                       
-                      bodyText += 'Please ensure your child arrives 10 minutes early with proper gear.\n\n';
-                      bodyText += 'Thank you,\nCoach Maldonado';
+                      htmlContent += `
+                          <p style="margin-top: 20px;">Please ensure your child arrives 10 minutes early with proper gear.</p>
+                          <p>Thank you,<br><strong>Coach Maldonado</strong></p>
+                        </div>
+                      `;
                       
-                      const body = encodeURIComponent(bodyText);
-                      window.open(`https://mail.google.com/mail/?view=cm&to=${emails}&su=${subject}&body=${body}`, '_blank');
+                      try {
+                        toast({ title: "Sending email...", description: "Please wait" });
+                        
+                        const { data, error } = await supabase.functions.invoke('send-email', {
+                          body: {
+                            to: 'abhishek86sr@gmail.com',
+                            subject: 'Schedule for the Week',
+                            html: htmlContent
+                          }
+                        });
+                        
+                        if (error) throw error;
+                        
+                        toast({ title: "Email sent!", description: "Schedule has been published successfully" });
+                      } catch (error: any) {
+                        console.error('Error sending email:', error);
+                        toast({ 
+                          title: "Failed to send email", 
+                          description: error.message || "Please try again",
+                          variant: "destructive"
+                        });
+                      }
                     }}
                   >
                     <Send className="w-4 h-4 mr-2" />
