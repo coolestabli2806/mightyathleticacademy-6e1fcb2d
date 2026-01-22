@@ -1912,9 +1912,26 @@ export default function AdminDashboard() {
                             ) : (
                               <div className="flex flex-wrap gap-2">
                                 {playerAttendance.slice(0, 10).map((record) => (
-                                  <Badge key={record.id} variant="outline" className="text-xs">
-                                    {format(parseDateOnly(record.session_date)!, 'MMM d, yyyy')}
-                                  </Badge>
+                                  <DropdownMenu key={record.id}>
+                                    <DropdownMenuTrigger asChild>
+                                      <Badge variant="outline" className="text-xs cursor-pointer hover:bg-muted">
+                                        {format(parseDateOnly(record.session_date)!, 'MMM d, yyyy')}
+                                      </Badge>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start">
+                                      <DropdownMenuItem onClick={() => openEditAttendance(record)}>
+                                        <Edit className="w-4 h-4 mr-2" />
+                                        Edit Date
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={() => handleDeleteAttendance(record.id, player.id)}
+                                        className="text-destructive"
+                                      >
+                                        <Trash2 className="w-4 h-4 mr-2" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 ))}
                                 {playerAttendance.length > 10 && (
                                   <Badge variant="secondary" className="text-xs">
@@ -2038,6 +2055,7 @@ export default function AdminDashboard() {
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Marked At</TableHead>
+                      <TableHead className="w-[80px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -2046,6 +2064,28 @@ export default function AdminDashboard() {
                         <TableCell>{format(parseDateOnly(record.session_date)!, 'MMM d, yyyy')}</TableCell>
                         <TableCell className="text-muted-foreground text-sm">
                           {new Date(record.marked_at).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditAttendance(record)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                onClick={() => handleDeleteAttendance(record.id, selectedPlayerHistory.id)}
+                                className="text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))}
